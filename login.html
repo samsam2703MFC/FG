@@ -30,9 +30,10 @@ const PORTAL_TARGETS = {
   candidate: { label: 'Candidate Portal',  tag: 'Open your franchise',          dest: 'candidate.html' },
   investor:  { label: 'Investor Portal',   tag: 'Track your investments',       dest: 'index.html' },
   developer: { label: 'Developer Portal',  tag: 'Propose locations & projects', dest: 'consultant.html' },
+  admin:     { label: 'Back Office',       tag: 'Admin & network management',   dest: 'backoffice.html' },
 };
 
-const ROLE_PORTAL = { investor: 'investor', admin: 'investor', consultant: 'brand', candidate: 'candidate' };
+const ROLE_PORTAL = { investor: 'investor', admin: 'admin', consultant: 'brand', candidate: 'candidate' };
 
 // Store auth in localStorage (7-day expiry)
 function storeAuth(user, token) {
@@ -60,7 +61,7 @@ function App() {
     try {
       const stored = JSON.parse(localStorage.getItem('fg_auth') || '{}');
       if (stored.token && Date.now() < stored.expiresAt) {
-        const dest = PORTAL_TARGETS[ROLE_PORTAL[stored.user?.role] || 'investor'].dest;
+        const dest = (PORTAL_TARGETS[ROLE_PORTAL[stored.user?.role]] || PORTAL_TARGETS.investor).dest;
         window.location.replace(dest);
       }
     } catch (_) {}

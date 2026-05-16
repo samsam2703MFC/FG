@@ -19,7 +19,37 @@
 <script type="text/babel" src="backoffice.jsx"></script>
 
 <script type="text/babel" data-presets="env,react">
-ReactDOM.createRoot(document.getElementById('root')).render(<BackOffice />);
+// Auth guard — admin and consultant roles only
+(function () {
+  try {
+    const stored = JSON.parse(localStorage.getItem('fg_auth') || '{}');
+    const allowed = ['admin', 'consultant'];
+    if (!stored.token || Date.now() >= stored.expiresAt) {
+      window.location.replace('login.html?portal=admin');
+      return;
+    }
+    if (!allowed.includes(stored.user?.role)) {
+      // Wrong role — send back to their own portal
+      const dest = stored.user?.role === 'investor' ? 'index.html' : 'login.html?portal=admin';
+      window.location.replace(dest);
+      return;
+    }
+    // Expose current user globally for BackOffice component
+    window.FG_CURRENT_USER = stored.user;
+  } catch (_) {
+    window.location.replace('login.html?portal=admin');
+  }
+})();
+
+function BackOfficeApp() {
+  const handleLogout = () => {
+    localStorage.removeItem('fg_auth');
+    window.location.replace('login.html?portal=admin');
+  };
+  return <BackOffice currentUser={window.FG_CURRENT_USER} onLogout={handleLogout} />;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<BackOfficeApp />);
 </script>
 </body>
 </html>

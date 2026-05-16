@@ -79,15 +79,15 @@ const COUNTRIES = [
 // ====================================================================
 // MAIN SHELL
 // ====================================================================
-function BackOffice() {
+function BackOffice({ currentUser, onLogout }) {
   return (
     <BoToastProvider>
-      <BoMain />
+      <BoMain currentUser={currentUser} onLogout={onLogout} />
     </BoToastProvider>
   );
 }
 
-function BoMain() {
+function BoMain({ currentUser, onLogout }) {
   const FG = window.FG_DATA;
   const A = window.PORTAL_DATA;
   const [view, setView] = bState(new URLSearchParams(location.search).get('view') || 'dashboard');
@@ -193,18 +193,19 @@ function BoMain() {
               <span className="bo-top__dot"></span>
             </button>
             <button className={'bo-user' + (userMenu ? ' is-open' : '')} onClick={() => setUserMenu(v => !v)}>
-              <span className="bo-user__avatar">SV</span>
+              <span className="bo-user__avatar">
+                {(currentUser?.name || currentUser?.email || 'A')[0].toUpperCase()}
+              </span>
               <span className="bo-user__col">
-                <span className="bo-user__name">Sam Verheyden</span>
-                <span className="bo-user__role">Group Admin</span>
+                <span className="bo-user__name">{currentUser?.name || 'Admin'}</span>
+                <span className="bo-user__role">{currentUser?.role === 'admin' ? 'Group Admin' : 'Consultant'}</span>
               </span>
               <BoIcon.chevron />
               {userMenu && (
                 <div className="bo-dropdown bo-dropdown--right">
-                  <button>Switch user</button>
                   <button>My profile</button>
                   <button>Audit log</button>
-                  <button>Sign out</button>
+                  <button onClick={onLogout} style={{ color: '#c0392b' }}>Sign out</button>
                 </div>
               )}
             </button>
