@@ -27,11 +27,14 @@ const { body, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
 const {
   INVESTORS,
+  BRANDS,
   BRAND_PORTFOLIOS,
   FG_DOCS,
   REPAYMENTS,
   INVESTOR_INTERESTS,
-  FG_OPPORTUNITIES
+  FG_OPPORTUNITIES,
+  SUPPORT_TICKETS,
+  INVESTOR_PREFERENCES
 } = require('../data/seed');
 const { createError } = require('../middleware/errorHandler');
 
@@ -245,5 +248,154 @@ router.post(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// PUT /api/investors/:id
+// ---------------------------------------------------------------------------
+router.put('/:id', (req, res, next) => {
+  const investor = INVESTORS.find(i => i.id === req.params.id);
+  if (!investor) return next(createError(404, `Investor '${req.params.id}' not found`, 'INVESTOR_NOT_FOUND'));
+
+  if (!canAccessInvestor(req, req.params.id)) {
+    return next(createError(403, 'Access denied', 'FORBIDDEN'));
+  }
+
+  const SCALAR_FIELDS = ['name', 'email', 'phone', 'address', 'role', 'tier'];
+  SCALAR_FIELDS.forEach(f => {
+    if (req.body[f] !== undefined) investor[f] = req.body[f];
+  });
+
+  if (req.body.profile !== undefined) {
+    if (req.user.role !== 'admin' && req.body.profile.notes !== undefined) {
+      return next(createError(403, 'Only admins can update notes via profile', 'FORBIDDEN'));
+    }
+    investor.profile = Object.assign({}, investor.profile || {}, req.body.profile);
+  }
+
+  investor.updatedAt = new Date().toISOString();
+
+  const { passwordHash, ...safe } = investor;
+  res.json({ data: safe });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/investors/:id/opportunities
+// ---------------------------------------------------------------------------
+router.get('/:id/opportunities', (req, res, next) => {
+  if (!canAccessInvestor(req, req.params.id)) {
+    return next(createError(403, 'Access denied', 'FORBIDDEN'));
+  }
+
+  const investor = INVESTORS.find(i => i.id === req.params.id);
+  if (!investor) return next(createError(404, `Investor '${req.params.id}' not found`, 'INVESTOR_NOT_FOUND'));
+
+  const interests = INVESTOR_INTERESTS.filter(i => i.investorId === req.params.id);
+  const interestedIds = new Set(interests.map(i => i.opportunityId));
+
+  const interested = interests.map(interest => {
+    const opp = FG_OPPORTUNITIES.find(o => o.id === interest.opportunityId);
+    return opp ? { ...opp, status: interest.status, interestId: interest.id, amount: interest.amount } : null;
+  }).filter(Boolean);
+
+  const budgetRef = (investor.totalInvested || 0) * 0.3;
+
+  const recommended = FG_OPPORTUNITIES
+    .filter(o => !interestedIds.has(o.id))
+    .map(o => {
+      const budgetFit = budgetRef > 0 ? Math.min(1, budgetRef / (o.ticketMin || 1)) : 0;
+      const brandMatch = (investor.brands || []).includes(o.brand) ? 1 : 0;
+      const score = budgetFit * 0.5 + brandMatch * 0.5;
+      return { ...o, score, budgetFit, brandMatch };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  res.json({ data: { interested, recommended } });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/investors/:id/contracts
+// ---------------------------------------------------------------------------
+router.get('/:id/contracts', (req, res, next) => {
+  if (!canAccessInvestor(req, req.params.id)) {
+    return next(createError(403, 'Access denied', 'FORBIDDEN'));
+  }
+
+  const investor = INVESTORS.find(i => i.id === req.params.id);
+  if (!investor) return next(createError(404, `Investor '${req.params.id}' not found`, 'INVESTOR_NOT_FOUND'));
+
+  const contracts = [];
+  (investor.brands || []).forEach(brandId => {
+    const portfolio = BRAND_PORTFOLIOS[brandId];
+    if (!portfolio) return;
+    const brand = BRANDS.find(b => b.id === brandId);
+    (portfolio.shops || []).forEach(shop => {
+      const startDate = shop.opened || investor.since;
+      const endYear = new Date(startDate).getFullYear() + 5;
+      const endDate = startDate.replace(/^\d{4}/, endYear);
+      contracts.push({
+        id: `contract-${investor.id}-${shop.id}`,
+        type: 'investment-agreement',
+        brand: brandId,
+        brandName: brand ? brand.name : brandId,
+        shop: shop.id,
+        shopName: shop.name,
+        amount: shop.invested || 0,
+        startDate,
+        endDate,
+        status: 'signed',
+        signedAt: startDate,
+        parties: [investor.name, 'Franchise Generation SA']
+      });
+    });
+  });
+
+  res.json({ data: contracts });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/investors/:id/communications
+// ---------------------------------------------------------------------------
+router.get('/:id/communications', (req, res, next) => {
+  if (!canAccessInvestor(req, req.params.id)) {
+    return next(createError(403, 'Access denied', 'FORBIDDEN'));
+  }
+
+  const investor = INVESTORS.find(i => i.id === req.params.id);
+  if (!investor) return next(createError(404, `Investor '${req.params.id}' not found`, 'INVESTOR_NOT_FOUND'));
+
+  let tickets = SUPPORT_TICKETS.filter(t => t.investorId === req.params.id);
+  if (tickets.length === 0) {
+    tickets = SUPPORT_TICKETS.slice(-3);
+  }
+
+  res.json({ data: tickets });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/investors/:id/notes
+// ---------------------------------------------------------------------------
+router.post('/:id/notes', authorize('admin', 'consultant'), (req, res, next) => {
+  const investor = INVESTORS.find(i => i.id === req.params.id);
+  if (!investor) return next(createError(404, `Investor '${req.params.id}' not found`, 'INVESTOR_NOT_FOUND'));
+
+  if (!req.body.text) {
+    return res.status(422).json({ error: 'text is required', code: 'VALIDATION_ERROR' });
+  }
+
+  if (!investor.profile) investor.profile = {};
+  if (!Array.isArray(investor.profile.notes)) investor.profile.notes = [];
+
+  const note = {
+    id: uuidv4(),
+    author: req.user.email,
+    text: req.body.text,
+    createdAt: new Date().toISOString(),
+    internal: true
+  };
+
+  investor.profile.notes.push(note);
+
+  res.status(201).json({ data: note });
+});
 
 module.exports = router;

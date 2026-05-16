@@ -553,7 +553,7 @@ function BoInvestors({ ctx }) {
           { k: 'projects', l: 'Projets',         render: () => A.PROJECTS.length + Object.values(FG.BRAND_PORTFOLIOS).reduce((a, b) => a + b.shops.length, 0) },
           { k: 'tri',      l: 'TRI moyen',       render: () => '8,4 %' },
           { k: 'since',    l: 'Since',           render: () => FG.INVESTOR.since },
-          { k: 'go',       l: '', align: 'right', render: () => <a className="bo-btn bo-btn--ghost bo-btn--xs" href="index.html">Open →</a> }
+          { k: 'go',       l: '', align: 'right', render: (r) => <a className="bo-btn bo-btn--ghost bo-btn--xs" href={`investor-profile.html?investor=${r.id}`}>Open →</a> }
         ]}
         rows={[FG.INVESTOR]}
       />
