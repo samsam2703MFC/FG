@@ -736,10 +736,9 @@ function addBusinessDays(days) {
   return d.toLocaleDateString('fr-BE', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-// Candidates side panel
-function CandidatesPanel({ opp, candidates, readOnly, onClose, onValidate }) {
-  const [confirming, setConfirming] = React.useState(null); // candidate to confirm
-
+// Candidates side panel — pure presenter; no modal state lives here.
+// "Valider" delegates up to onRequestValidate(lead) so the parent owns sequencing.
+function CandidatesPanel({ opp, candidates, readOnly, onClose, onRequestValidate }) {
   return (
     <>
       <div className="bo-panel-backdrop" onClick={onClose} />
@@ -777,7 +776,7 @@ function CandidatesPanel({ opp, candidates, readOnly, onClose, onValidate }) {
                 </div>
                 {!readOnly && (
                   <button className="bo-btn bo-btn--primary bo-btn--sm"
-                    onClick={() => setConfirming(lead)}>
+                    onClick={() => onRequestValidate(lead)}>
                     ✓ Valider
                   </button>
                 )}
@@ -807,31 +806,35 @@ function CandidatesPanel({ opp, candidates, readOnly, onClose, onValidate }) {
           ))}
         </div>
       </aside>
-
-      {confirming && (
-        <ValidateConfirmModal
-          candidate={confirming}
-          opp={opp}
-          losersCount={candidates.length - 1}
-          onClose={() => setConfirming(null)}
-          onConfirm={() => { onValidate(confirming); setConfirming(null); }}
-        />
-      )}
     </>
   );
 }
 
-// Validate confirmation modal
+// Step 1 — confirmation modal.
+// Rendered as a scrim+modal Fragment at BoOpportunities level (sibling to the panel, not child).
+// z-index 400/401 guarantees it appears above the panel (z-index 301) with a single backdrop.
 function ValidateConfirmModal({ candidate, opp, losersCount, onClose, onConfirm }) {
   const [busy, setBusy] = React.useState(false);
-  const confirm = () => { setBusy(true); setTimeout(() => { onConfirm(); setBusy(false); }, 600); };
+  const modalRef = React.useRef(null);
+  React.useEffect(() => { modalRef.current?.focus(); }, []);
+
+  const confirm = () => {
+    if (busy) return;
+    setBusy(true);
+    // Short visual delay so the user sees the button activate, then hand off to parent.
+    // The modal will be unmounted by the parent; no setBusy(false) needed.
+    setTimeout(onConfirm, 400);
+  };
 
   return (
-    <div className="bo-modal-overlay" style={{ zIndex: 600 }}>
-      <div className="bo-modal bo-modal--confirm">
+    <>
+      <div className="bo-scrim" style={{ zIndex: 400 }} onClick={busy ? undefined : onClose} />
+      <div className="bo-modal bo-modal--confirm" style={{ zIndex: 401 }}
+           ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true"
+           aria-labelledby="vcm-title">
         <header className="bo-modal__head">
           <p className="bo-modal__eyebrow">Confirmer la validation</p>
-          <h2 className="bo-modal__title">Valider {candidate.candidate.name} ?</h2>
+          <h2 className="bo-modal__title" id="vcm-title">Valider {candidate.candidate.name} ?</h2>
         </header>
         <div className="bo-modal__body" style={{ padding: '0 24px 8px' }}>
           <div className="bo-confirm-effect">
@@ -854,7 +857,7 @@ function ValidateConfirmModal({ candidate, opp, losersCount, onClose, onConfirm 
             <div className="bo-confirm-effect__item">
               <span className="bo-confirm-effect__icon">🔒</span>
               <div>
-                <strong>Opportunité {opp.name}</strong>
+                <strong>Opportunité {opp?.name}</strong>
                 <p>Statut → <em>Closed — Won</em> · journal d'audit enregistré</p>
               </div>
             </div>
@@ -868,7 +871,72 @@ function ValidateConfirmModal({ candidate, opp, losersCount, onClose, onConfirm 
           </button>
         </footer>
       </div>
-    </div>
+    </>
+  );
+}
+
+// Step 2 — success / onboarding detail modal.
+// Only ever mounts after ValidateConfirmModal is fully unmounted (parent guarantees sequencing).
+// Same z-index pattern: single backdrop, no overlap possible.
+function ValidationSuccessModal({ candidate, opp, onClose }) {
+  const modalRef = React.useRef(null);
+  React.useEffect(() => { modalRef.current?.focus(); }, []);
+
+  return (
+    <>
+      <div className="bo-scrim" style={{ zIndex: 400 }} onClick={onClose} />
+      <div className="bo-modal" style={{ zIndex: 401, maxWidth: 520 }}
+           ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true"
+           aria-labelledby="vsm-title">
+        <header className="bo-modal__head">
+          <div>
+            <p className="bo-modal__eyebrow">Onboarding démarré</p>
+            <h2 className="bo-modal__title" id="vsm-title">✓ {candidate.candidate.name} validé(e)</h2>
+            <p className="bo-modal__sub">{opp?.name}</p>
+          </div>
+          <button className="bo-modal__close" onClick={onClose}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 3l10 10M13 3L3 13"/>
+            </svg>
+          </button>
+        </header>
+        <div className="bo-modal__body" style={{ padding: '0 24px 8px' }}>
+          <div className="bo-confirm-effect">
+            <div className="bo-confirm-effect__item bo-confirm-effect__item--win">
+              <span className="bo-confirm-effect__icon">🏆</span>
+              <div>
+                <strong>Dossier onboarding créé</strong>
+                <p>Candidat: <strong>{candidate.candidate.name}</strong> · Étape: <em>Préparation contrat</em></p>
+              </div>
+            </div>
+            <div className="bo-confirm-effect__item">
+              <span className="bo-confirm-effect__icon">📅</span>
+              <div>
+                <strong>Prochaine action</strong>
+                <p>Signature du contrat de franchise planifiée avant le <em>{addBusinessDays(5)}</em></p>
+              </div>
+            </div>
+            <div className="bo-confirm-effect__item">
+              <span className="bo-confirm-effect__icon">📋</span>
+              <div>
+                <strong>Tâches CRM créées</strong>
+                <p>Rappel envoyé aux autres candidats · échéance: <em>{addBusinessDays(3)}</em></p>
+              </div>
+            </div>
+            <div className="bo-confirm-effect__item">
+              <span className="bo-confirm-effect__icon">🔒</span>
+              <div>
+                <strong>Opportunité clôturée</strong>
+                <p>{opp?.name} → <em>Closed — Won</em> · Journal d'audit enregistré</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <footer className="bo-modal__actions">
+          <button className="bo-btn bo-btn--primary" onClick={onClose}>Fermer</button>
+        </footer>
+      </div>
+    </>
   );
 }
 
@@ -877,8 +945,9 @@ function BoOpportunities({ ctx }) {
   const currentUser = window.FG_CURRENT_USER || {};
   const [closedFilter, setClosedFilter] = React.useState(false);
   const [panelOppId,   setPanelOppId]   = React.useState(null);
-  // local closed set — tracks opps closed in this session
-  const [closedMap, setClosedMap] = React.useState({});
+  const [confirmLead,  setConfirmLead]  = React.useState(null); // step-1 modal
+  const [successData,  setSuccessData]  = React.useState(null); // step-2 modal
+  const [closedMap,    setClosedMap]    = React.useState({});
 
   const getCandidates = (oppId) =>
     FG.CANDIDATE_LEADS.filter(l => l.opportunity === oppId);
@@ -893,10 +962,20 @@ function BoOpportunities({ ctx }) {
   const panelCandidates = panelOppId ? getCandidates(panelOppId) : [];
   const panelReadOnly = panelOpp && (panelOpp.status === 'closed-won' || !!closedMap[panelOpp?.id]);
 
-  const handleValidate = async (lead) => {
-    const oppId = panelOppId;
-    // Call API — fall back to local state if API unavailable
-    try {
+  // Two-step modal sequencing:
+  //   1. setConfirmLead(null)  — unmounts first modal immediately
+  //   2. await setTimeout(0)   — yields so React commits that unmount
+  //   3. API call + local state — transaction
+  //   4. setPanelOppId + setSuccessData — close panel, mount second modal (same batch)
+  const handleConfirmValidate = async () => {
+    const lead        = confirmLead;
+    const oppId       = panelOppId; // capture before any state mutation
+    const capturedOpp = allOpps.find(o => o.id === oppId) || { id: oppId, name: oppId };
+
+    setConfirmLead(null); // step 1 — first modal unmounts
+    await new Promise(r => setTimeout(r, 0)); // step 2 — let React commit
+
+    try { // step 3 — transaction
       const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
       await fetch(`/api/opportunities/${oppId}/validate`, {
         method: 'POST',
@@ -904,17 +983,17 @@ function BoOpportunities({ ctx }) {
         body: JSON.stringify({ candidateId: lead.id }),
         signal: AbortSignal.timeout(5000),
       });
-    } catch (_) { /* demo: continue regardless */ }
+    } catch (_) { /* demo: proceed regardless */ }
 
     setClosedMap(m => ({
       ...m,
       [oppId]: { validatedCandidateId: lead.id, validatedBy: currentUser.email, validatedAt: new Date().toISOString() }
     }));
-    // Update the opp object for read-only panel display
     const opp = allOpps.find(o => o.id === oppId);
     if (opp) { opp.status = 'closed-won'; opp.validatedCandidateId = lead.id; }
-    toast('success', `✓ ${lead.candidate.name} validé(e) · Onboarding démarré`);
-    setPanelOppId(null);
+
+    setPanelOppId(null);          // step 4 — close panel…
+    setSuccessData({ lead, opp: capturedOpp }); // …and open second modal in same batch
   };
 
   return (
@@ -979,13 +1058,34 @@ function BoOpportunities({ ctx }) {
         rows={shownOpps}
       />
 
+      {/* Slide-over panel — no modal state inside it */}
       {panelOpp && (
         <CandidatesPanel
           opp={{ ...panelOpp, ...(closedMap[panelOpp.id] || {}) }}
           candidates={panelCandidates}
           readOnly={panelReadOnly}
           onClose={() => setPanelOppId(null)}
-          onValidate={handleValidate}
+          onRequestValidate={setConfirmLead}
+        />
+      )}
+
+      {/* Step 1 — confirm modal: sibling to panel, z-index 400/401, single backdrop */}
+      {confirmLead && (
+        <ValidateConfirmModal
+          candidate={confirmLead}
+          opp={panelOpp}
+          losersCount={panelCandidates.length - 1}
+          onClose={() => setConfirmLead(null)}
+          onConfirm={handleConfirmValidate}
+        />
+      )}
+
+      {/* Step 2 — success modal: only mounts after confirmLead=null (first modal unmounted) */}
+      {successData && (
+        <ValidationSuccessModal
+          candidate={successData.lead}
+          opp={successData.opp}
+          onClose={() => setSuccessData(null)}
         />
       )}
     </>
