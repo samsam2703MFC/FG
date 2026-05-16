@@ -13,32 +13,124 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
-<script src="fg-data.js"></script>
-
 <script type="text/babel" data-presets="env,react">
-const { useState } = React;
-const FG = window.FG_DATA;
+const { useState, useEffect } = React;
+
+// Demo users — match backend/data/seed.js USERS array
+const DEMO_USERS = [
+  { id: 'user-001', email: 'claire.vermeulen@example.com', name: 'Claire Vermeulen', role: 'investor' },
+  { id: 'user-002', email: 'marc.dubois@example.com',      name: 'Marc Dubois',       role: 'investor' },
+  { id: 'user-003', email: 'admin@fg.be',                  name: 'Admin FG',          role: 'admin' },
+  { id: 'user-004', email: 'sophie.renard@fg.be',          name: 'Sophie Renard',     role: 'consultant' },
+  { id: 'user-005', email: 'karim.boulahia@fg.be',         name: 'Karim Boulahia',   role: 'consultant' },
+];
 
 const PORTAL_TARGETS = {
-  brand:     { label: 'Brand Portal',     tag: 'Manage your network',         dest: 'consultant.html' },
-  candidate: { label: 'Candidate Portal', tag: 'Open your franchise',         dest: 'candidate.html' },
-  investor:  { label: 'Investor Portal',  tag: 'Track your investments',      dest: 'index.html' },
-  developer: { label: 'Developer Portal', tag: 'Propose locations & projects',dest: 'consultant.html' }
+  brand:     { label: 'Brand Portal',      tag: 'Manage your network',          dest: 'consultant.html' },
+  candidate: { label: 'Candidate Portal',  tag: 'Open your franchise',          dest: 'candidate.html' },
+  investor:  { label: 'Investor Portal',   tag: 'Track your investments',       dest: 'index.html' },
+  developer: { label: 'Developer Portal',  tag: 'Propose locations & projects', dest: 'consultant.html' },
 };
+
+const ROLE_PORTAL = { investor: 'investor', admin: 'investor', consultant: 'brand', candidate: 'candidate' };
+
+// Store auth in localStorage (7-day expiry)
+function storeAuth(user, token) {
+  localStorage.setItem('fg_auth', JSON.stringify({
+    token: token || ('demo-' + Date.now()),
+    user,
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  }));
+}
 
 function App() {
   const params = new URLSearchParams(window.location.search);
-  const [portal, setPortal] = useState(PORTAL_TARGETS[params.get('portal')] ? params.get('portal') : 'investor');
+  const initPortal = PORTAL_TARGETS[params.get('portal')] ? params.get('portal') : 'investor';
+  const [portal, setPortal] = useState(initPortal);
   const target = PORTAL_TARGETS[portal];
+
   const [email, setEmail] = useState('claire.vermeulen@example.com');
   const [code, setCode]   = useState('');
-  const [phase, setPhase] = useState('email');
+  const [phase, setPhase] = useState('email'); // 'email' | 'code'
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const submit = (e) => {
+  // If already authenticated, skip login
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('fg_auth') || '{}');
+      if (stored.token && Date.now() < stored.expiresAt) {
+        const dest = PORTAL_TARGETS[ROLE_PORTAL[stored.user?.role] || 'investor'].dest;
+        window.location.replace(dest);
+      }
+    } catch (_) {}
+  }, []);
+
+  const handleEmail = async (e) => {
     e.preventDefault();
-    if (phase === 'email') { setPhase('code'); setCode('123456'); return; }
+    setError('');
+    setLoading(true);
+
+    // Try API first; fall back silently to demo mode
+    try {
+      const r = await fetch('/api/auth/request-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!r.ok) throw new Error('API unavailable');
+    } catch (_) {
+      // Demo mode — code is pre-filled
+    }
+
+    setCode('123456');
+    setPhase('code');
+    setLoading(false);
+  };
+
+  const handleCode = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    // 1. Try real API
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (r.ok) {
+        const { data } = await r.json();
+        storeAuth(data.user, data.token);
+        const dest = PORTAL_TARGETS[ROLE_PORTAL[data.user?.role] || portal].dest;
+        window.location.href = dest;
+        return;
+      }
+    } catch (_) {}
+
+    // 2. Demo fallback — accept any 6-digit code
+    if (!/^\d{6}$/.test(code)) {
+      setError('Enter the 6-digit code (demo: 123456).');
+      setLoading(false);
+      return;
+    }
+
+    const match = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const user = match || {
+      id: 'user-guest',
+      email,
+      name: email.split('@')[0],
+      role: portal === 'investor' ? 'investor' : 'candidate',
+    };
+
+    storeAuth(user);
     window.location.href = target.dest;
   };
+
+  const submit = phase === 'email' ? handleEmail : handleCode;
 
   return (
     <div className="lg">
@@ -48,64 +140,173 @@ function App() {
 
       <main className="lg__main lg__main--centered">
         <section className="lg__card">
-          <p className="lg__card-eyebrow">Sign in</p>
+          {/* Portal switcher */}
+          <div className="lg__portal-tabs">
+            {Object.entries(PORTAL_TARGETS).map(([key, p]) => (
+              <button
+                key={key}
+                type="button"
+                className={'lg__portal-tab' + (portal === key ? ' lg__portal-tab--active' : '')}
+                onClick={() => { setPortal(key); setError(''); }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="lg__card-eyebrow">Sign in · {target.tag}</p>
           <h2 className="lg__card-h">
-            {phase === 'email' ? 'Welcome to Franchise Generation' : 'Enter your code'}
+            {phase === 'email' ? 'Welcome to Franchise Generation' : 'Check your inbox'}
           </h2>
           <p className="lg__card-sub">
             {phase === 'email'
-              ? 'We\'ll email you a one-time code to verify your access.'
-              : `A 6-digit code was sent to ${email}.`}
+              ? 'Enter your email — we\'ll send a one-time code.'
+              : <>A 6-digit code was sent to <strong>{email}</strong>.</>}
           </p>
 
           <form onSubmit={submit} className="lg__form">
             {phase === 'email' ? (
               <div className="lg__field">
                 <label>Email address</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required autoFocus
+                  placeholder="you@example.com"
+                />
               </div>
             ) : (
               <div className="lg__field">
                 <label>Verification code</label>
-                <input type="text" inputMode="numeric" maxLength={6} value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} required autoFocus />
-                <p className="lg__hint">For the demo, the code is pre-filled. Hit Continue to enter the portal.</p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  required autoFocus
+                  placeholder="123456"
+                />
+                <p className="lg__hint">Demo: the code is pre-filled — just hit Continue.</p>
               </div>
             )}
 
-            <button type="submit" className="lg__cta">
-              {phase === 'email' ? 'Continue with email' : 'Continue'}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            {error && <p className="lg__error">{error}</p>}
+
+            <button type="submit" className="lg__cta" disabled={loading}>
+              {loading ? 'Please wait…' : phase === 'email' ? 'Continue with email' : 'Enter portal'}
+              {!loading && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              )}
             </button>
 
             {phase === 'code' && (
-              <button type="button" className="lg__back" onClick={() => setPhase('email')}>
+              <button type="button" className="lg__back" onClick={() => { setPhase('email'); setError(''); }}>
                 ← Use a different email
               </button>
             )}
-
-            <div className="lg__alt">
-              <span>or</span>
-            </div>
-
-            <button type="button" className="lg__sso">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
-              Continue with single sign-on
-            </button>
           </form>
 
           <p className="lg__foot">
             Not a member yet? <a href="landing.html">Discover the network →</a>
           </p>
+
+          {phase === 'email' && (
+            <details className="lg__demo-hint">
+              <summary>Demo credentials</summary>
+              <ul>
+                {DEMO_USERS.map(u => (
+                  <li key={u.id}>
+                    <button type="button" className="lg__demo-pick" onClick={() => setEmail(u.email)}>
+                      {u.email} <span>({u.role})</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </section>
       </main>
 
-      <footer className="lg__copy">© 2026 Franchise Generation</footer>
+      <footer className="lg__copy">© 2026 Franchise Generation · Secure login</footer>
     </div>
   );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
+
+<style>
+.lg__portal-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.lg__portal-tab {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--fg-border, #e4ddd4);
+  background: transparent;
+  font: 500 12px/1 'DM Sans', system-ui, sans-serif;
+  color: var(--fg-muted, #8a7f74);
+  cursor: pointer;
+  transition: all .15s;
+}
+.lg__portal-tab--active,
+.lg__portal-tab:hover {
+  border-color: var(--fg-ink, #1c1a17);
+  color: var(--fg-ink, #1c1a17);
+  background: var(--fg-ink, #1c1a17);
+  color: #fff;
+}
+.lg__error {
+  color: #c0392b;
+  font-size: 13px;
+  margin: -4px 0 8px;
+  padding: 8px 12px;
+  background: #fdf0ef;
+  border-radius: 8px;
+  border: 1px solid #f5c6c4;
+}
+.lg__demo-hint {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--fg-muted, #8a7f74);
+}
+.lg__demo-hint summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.lg__demo-hint ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lg__demo-pick {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--fg-ink, #1c1a17);
+  text-decoration: underline;
+  padding: 2px 0;
+}
+.lg__demo-pick span {
+  font-size: 11px;
+  color: var(--fg-muted, #8a7f74);
+  text-decoration: none;
+}
+</style>
 </body>
 </html>

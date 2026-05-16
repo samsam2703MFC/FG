@@ -72,7 +72,7 @@ function BrandMark({ brand, size = 26 }) {
 // ====================================================================
 // SIDEBAR
 // ====================================================================
-function FgSidebar({ scope, brand, route, goTo, fgNav, brands, fgData }) {
+function FgSidebar({ scope, brand, route, goTo, fgNav, brands, fgData, currentUser, onLogout }) {
   return (
     <aside className="fg-sidebar">
       {/* FG header */}
@@ -122,7 +122,31 @@ function FgSidebar({ scope, brand, route, goTo, fgNav, brands, fgData }) {
         })}
       </div>
 
-
+      {/* User footer */}
+      {(currentUser || onLogout) && (
+        <div className="fg-sidebar-footer">
+          {currentUser && (
+            <div className="fg-sidebar-user">
+              <div className="fg-sidebar-user__avatar">
+                {(currentUser.name || currentUser.email || 'U')[0].toUpperCase()}
+              </div>
+              <div className="fg-sidebar-user__info">
+                <div className="fg-sidebar-user__name">{currentUser.name || currentUser.email}</div>
+                <div className="fg-sidebar-user__role">{currentUser.role || 'Investisseur'}</div>
+              </div>
+            </div>
+          )}
+          {onLogout && (
+            <button className="fg-sidebar-logout" onClick={onLogout} title="Se déconnecter">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
     </aside>
   );
 }

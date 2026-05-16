@@ -34,15 +34,36 @@ const { useState, useMemo, useEffect } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "chartKind": "bar",
-  "logged": true,
   "scope": "atelier",
   "section": "presentation",
   "showWelcomeToast": true
 }/*EDITMODE-END*/;
 
+// Read auth from localStorage; return null if missing/expired
+function getStoredAuth() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('fg_auth') || '{}');
+    if (stored.token && Date.now() < stored.expiresAt) return stored;
+  } catch (_) {}
+  return null;
+}
+
 function App() {
   const [tweaks, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
-  const [logged, setLogged] = useState(tweaks.logged !== false);
+  const [auth, setAuth] = useState(getStoredAuth);
+  const logged = !!auth;
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!auth) {
+      window.location.replace('login.html?portal=investor');
+    }
+  }, [auth]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('fg_auth');
+    window.location.replace('login.html?portal=investor');
+  };
   const [route, setRoute] = useState({
     scope: tweaks.scope || 'fg',
     section: tweaks.section || 'dashboard',
@@ -76,14 +97,7 @@ function App() {
   }, [route.scope, tweaks.showWelcomeToast]);
 
   if (!logged) {
-    // Investor portal entry is gated by a minimal login screen; the public
-    // marketing site lives in landing.html.
-    return (
-      <>
-        <LoginScreen onLogin={() => { setLogged(true); setTweak('logged', true); }} />
-        <TweaksUI tweaks={tweaks} setTweak={setTweak} />
-      </>
-    );
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'DM Sans, system-ui' }}>Redirecting…</div>;
   }
 
   const brand = route.scope !== 'fg' ? FG.brandById(route.scope) : null;
@@ -156,7 +170,8 @@ function App() {
     <>
       <div className="shell" style={{ gridTemplateColumns: '256px 1fr' }}>
         <FgSidebar scope={route.scope} brand={brand} route={route} goTo={goTo}
-          fgNav={fgNav} brands={FG.BRANDS} fgData={FG} />
+          fgNav={fgNav} brands={FG.BRANDS} fgData={FG}
+          currentUser={auth?.user} onLogout={handleLogout} />
         <main className="shell__main">
           <FgTopbar scope={route.scope} brand={brand} route={route} goTo={goTo} unread={unread} />
           <FgBrandTabs scope={route.scope} brand={brand} route={route} goTo={goTo} fgData={FG} />
