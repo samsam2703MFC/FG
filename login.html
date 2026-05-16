@@ -18,11 +18,20 @@ const { useState, useEffect } = React;
 
 // Demo users — match backend/data/seed.js USERS array
 const DEMO_USERS = [
-  { id: 'user-001', email: 'claire.vermeulen@example.com', name: 'Claire Vermeulen', role: 'investor' },
-  { id: 'user-002', email: 'marc.dubois@example.com',      name: 'Marc Dubois',       role: 'investor' },
-  { id: 'user-003', email: 'admin@fg.be',                  name: 'Admin FG',          role: 'admin' },
-  { id: 'user-004', email: 'sophie.renard@fg.be',          name: 'Sophie Renard',     role: 'consultant' },
-  { id: 'user-005', email: 'karim.boulahia@fg.be',         name: 'Karim Boulahia',   role: 'consultant' },
+  { id: 'user-001', email: 'claire.vermeulen@example.com', name: 'Claire Vermeulen', role: 'investor',   portal: 'investor',   desc: 'Investor Portal'   },
+  { id: 'user-002', email: 'marc.dubois@example.com',      name: 'Marc Dubois',      role: 'investor',   portal: 'investor',   desc: 'Investor Portal'   },
+  { id: 'user-003', email: 'admin@fg.be',                  name: 'Admin FG',         role: 'admin',      portal: 'admin',      desc: 'Back Office'       },
+  { id: 'user-004', email: 'sophie.renard@fg.be',          name: 'Sophie Renard',    role: 'consultant', portal: 'brand',      desc: 'Consultant Portal' },
+  { id: 'user-005', email: 'karim.boulahia@fg.be',         name: 'Karim Boulahia',  role: 'consultant', portal: 'brand',      desc: 'Consultant Portal' },
+  { id: 'user-006', email: 'lea.dupuis@example.com',       name: 'Léa Dupuis',       role: 'candidate',  portal: 'candidate',  desc: 'Candidate Portal'  },
+  { id: 'user-007', email: 'tom.janssen@example.com',      name: 'Tom Janssen',      role: 'candidate',  portal: 'candidate',  desc: 'Candidate Portal'  },
+];
+
+const DEMO_GROUPS = [
+  { key: 'investor',   label: 'Investor',   icon: '📈', color: '#8D1D2C' },
+  { key: 'candidate',  label: 'Candidate',  icon: '🏪', color: '#B8862E' },
+  { key: 'consultant', label: 'Consultant', icon: '🧭', color: '#2E6B8D' },
+  { key: 'admin',      label: 'Admin',      icon: '⚙️', color: '#444'    },
 ];
 
 const PORTAL_TARGETS = {
@@ -200,22 +209,51 @@ function App() {
           <p className="lg__foot">
             Not a member yet? <a href="landing.html">Discover the network →</a>
           </p>
-
-          {phase === 'email' && (
-            <details className="lg__demo-hint">
-              <summary>Demo credentials</summary>
-              <ul>
-                {DEMO_USERS.map(u => (
-                  <li key={u.id}>
-                    <button type="button" className="lg__demo-pick" onClick={() => setEmail(u.email)}>
-                      {u.email} <span>({u.role})</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
         </section>
+
+        {/* Demo accounts — shown below the card */}
+        <div className="lg__demo-section">
+          <p className="lg__demo-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{width:13,height:13,verticalAlign:'middle'}}><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            Test accounts — code&nbsp;<strong>123456</strong>
+          </p>
+          <div className="lg__demo-groups">
+            {DEMO_GROUPS.map(g => {
+              const users = DEMO_USERS.filter(u => u.role === g.key);
+              if (!users.length) return null;
+              return (
+                <div key={g.key} className="lg__demo-group">
+                  <p className="lg__demo-group-label" style={{'--group-color': g.color}}>
+                    {g.icon} {g.label}
+                  </p>
+                  {users.map(u => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className="lg__demo-tile"
+                      onClick={() => {
+                        setEmail(u.email);
+                        setPortal(u.portal);
+                        setPhase('email');
+                        setError('');
+                        window.scrollTo({top: 0, behavior: 'smooth'});
+                      }}
+                    >
+                      <span className="lg__demo-tile__avatar" style={{background: g.color}}>
+                        {u.name[0]}
+                      </span>
+                      <span className="lg__demo-tile__info">
+                        <span className="lg__demo-tile__name">{u.name}</span>
+                        <span className="lg__demo-tile__email">{u.email}</span>
+                      </span>
+                      <span className="lg__demo-tile__dest">{u.desc} →</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </main>
 
       <footer className="lg__copy">© 2026 Franchise Generation · Secure login</footer>
@@ -227,6 +265,93 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 
 <style>
+.lg__demo-section {
+  width: 100%;
+  max-width: 480px;
+  margin-top: 28px;
+}
+.lg__demo-title {
+  font: 500 12px/1.5 'DM Sans', system-ui, sans-serif;
+  color: rgba(14,27,40,.45);
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.lg__demo-groups {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.lg__demo-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lg__demo-group-label {
+  font: 600 10px/1 'DM Sans', system-ui, sans-serif;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--group-color, #444);
+  margin: 0 0 2px;
+  padding: 0 2px;
+}
+.lg__demo-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1.5px solid rgba(14,27,40,.08);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, box-shadow .15s;
+  width: 100%;
+}
+.lg__demo-tile:hover {
+  border-color: rgba(14,27,40,.25);
+  box-shadow: 0 2px 8px rgba(14,27,40,.07);
+}
+.lg__demo-tile__avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  font: 600 13px/30px 'DM Sans', system-ui, sans-serif;
+  text-align: center;
+  flex-shrink: 0;
+}
+.lg__demo-tile__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.lg__demo-tile__name {
+  font: 600 12px/1 'DM Sans', system-ui, sans-serif;
+  color: #1c1a17;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lg__demo-tile__email {
+  font: 400 10px/1 'DM Sans', system-ui, sans-serif;
+  color: rgba(14,27,40,.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lg__demo-tile__dest {
+  font: 500 10px/1 'DM Sans', system-ui, sans-serif;
+  color: rgba(14,27,40,.35);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+@media (max-width: 500px) {
+  .lg__demo-groups { grid-template-columns: 1fr; }
+}
 .lg__portal-tabs {
   display: flex;
   gap: 6px;
