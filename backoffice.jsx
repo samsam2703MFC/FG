@@ -1266,26 +1266,119 @@ function ModalNewShop({ ctx, onClose }) {
 
 function ModalNewOpportunity({ ctx, onClose }) {
   const { FG } = ctx;
-  const [name, setName] = bState('');
-  const [brand, setBrand] = bState(FG.BRANDS[0].id);
-  const [city, setCity] = bState('');
-  const [budget, setBudget] = bState('');
-  const [busy, submit] = useFakeSubmit(() => { toast('success', `Opportunity "${name}" created.`); onClose(); });
+  const DEVS = FG.DEVELOPERS || [];
+
+  const [brand,     setBrand]     = bState(FG.BRANDS[0].id);
+  const [devId,     setDevId]     = bState('');
+  const [locId,     setLocId]     = bState('');
+  const [ticketMin, setTicketMin] = bState('');
+  const [ticketMax, setTicketMax] = bState('');
+  const [roiTarget, setRoiTarget] = bState('');
+  const [status,    setStatus]    = bState('open');
+
+  const dev       = DEVS.find(d => d.id === devId) || null;
+  const locations = dev ? dev.locations.filter(l => l.status === 'available' || l.status === 'under-review') : [];
+  const loc       = locations.find(l => l.id === locId) || null;
+
+  // When developer changes, reset location
+  const handleDevChange = (id) => { setDevId(id); setLocId(''); };
+
+  const canSubmit = brand && devId && locId;
+  const [busy, submit] = useFakeSubmit(() => {
+    toast('success', `Opportunity created · ${FG.brandById(brand)?.name} @ ${loc?.city}`);
+    onClose();
+  });
+
   return (
-    <BoModal open title="New opportunity" eyebrow="Opportunities" onClose={onClose} onSubmit={() => name ? submit() : toast('error', 'Project name required.')} submitLabel="Create" busy={busy}>
-      <BoField label="Project name *"><input value={name} onChange={e => setName(e.target.value)} required /></BoField>
+    <BoModal open title="New opportunity" eyebrow="Opportunities" onClose={onClose}
+      onSubmit={() => canSubmit ? submit() : toast('error', 'Select a brand and a developer location.')}
+      submitLabel="Create opportunity" busy={busy}>
+
+      {/* Row 1: Brand + Developer */}
       <div className="bo-form-row">
-        <BoField label="Brand">
+        <BoField label="Brand *">
           <select value={brand} onChange={e => setBrand(e.target.value)}>
             {FG.BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </BoField>
-        <BoField label="City"><input value={city} onChange={e => setCity(e.target.value)} /></BoField>
+        <BoField label="Developer *">
+          <select value={devId} onChange={e => handleDevChange(e.target.value)}>
+            <option value="">— Select developer —</option>
+            {DEVS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </BoField>
+      </div>
+
+      {/* Location dropdown — only shown once a developer is selected */}
+      {devId && (
+        <BoField label="Location *">
+          <select value={locId} onChange={e => setLocId(e.target.value)}>
+            <option value="">— Select location —</option>
+            {locations.map(l => (
+              <option key={l.id} value={l.id}>{l.address} · {l.surface}</option>
+            ))}
+            {!locations.length && <option disabled>No available locations for this developer</option>}
+          </select>
+        </BoField>
+      )}
+
+      {/* Location details card — shown once a location is selected */}
+      {loc && (
+        <div className="bo-location-card">
+          <div className="bo-location-card__row">
+            <span className="bo-location-card__label">Address</span>
+            <span>{loc.address}</span>
+          </div>
+          <div className="bo-location-card__row">
+            <span className="bo-location-card__label">Surface</span>
+            <span>{loc.surface}</span>
+          </div>
+          <div className="bo-location-card__row">
+            <span className="bo-location-card__label">Type</span>
+            <span>{loc.type}</span>
+          </div>
+          <div className="bo-location-card__row">
+            <span className="bo-location-card__label">Available from</span>
+            <span>{loc.availability}</span>
+          </div>
+          <div className="bo-location-card__row">
+            <span className="bo-location-card__label">Monthly rent</span>
+            <span>€{loc.rent?.toLocaleString()}/month</span>
+          </div>
+          {loc.notes && (
+            <div className="bo-location-card__row">
+              <span className="bo-location-card__label">Notes</span>
+              <span className="bo-location-card__note">{loc.notes}</span>
+            </div>
+          )}
+          {dev && (
+            <div className="bo-location-card__row">
+              <span className="bo-location-card__label">Contact</span>
+              <span>{dev.contactName} · {dev.email}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Financial details */}
+      <div className="bo-form-row">
+        <BoField label="Min ticket (€)">
+          <input type="number" value={ticketMin} onChange={e => setTicketMin(e.target.value)} placeholder="25 000" />
+        </BoField>
+        <BoField label="Max ticket (€)">
+          <input type="number" value={ticketMax} onChange={e => setTicketMax(e.target.value)} placeholder="200 000" />
+        </BoField>
       </div>
       <div className="bo-form-row">
-        <BoField label="Required investment (€)"><input value={budget} onChange={e => setBudget(e.target.value)} placeholder="180 000" /></BoField>
+        <BoField label="ROI target (%)">
+          <input type="number" value={roiTarget} onChange={e => setRoiTarget(e.target.value)} placeholder="8.0" step="0.1" />
+        </BoField>
         <BoField label="Status">
-          <select defaultValue="open"><option value="open">Open</option><option value="pre">Pre-launch</option><option value="closing">Closing imminent</option></select>
+          <select value={status} onChange={e => setStatus(e.target.value)}>
+            <option value="open">Open</option>
+            <option value="pre">Pre-launch</option>
+            <option value="closing">Closing imminent</option>
+          </select>
         </BoField>
       </div>
     </BoModal>

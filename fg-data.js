@@ -642,6 +642,48 @@
   ];
 
   // ====================================================================
+  // DEVELOPERS (real estate partners) → GET /developers
+  // ====================================================================
+  const DEVELOPERS = [
+    {
+      id: 'dev-001',
+      name: 'Immobilière Belge SA',
+      contactName: 'Jean-Luc Fontaine',
+      email: 'jl.fontaine@immobel.be',
+      phone: '+32 2 345 67 89',
+      type: 'Promoteur institutionnel',
+      status: 'active',
+      locations: [
+        { id: 'loc-001', address: 'Chaussée de Charleroi 200, 1060 Bruxelles', city: 'Bruxelles', surface: '85 m²', type: 'Cellule commerciale rez', availability: '2026-09-01', rent: 2800, notes: 'Angle rue · forte visibilité piétonne', status: 'available' },
+      ]
+    },
+    {
+      id: 'dev-002',
+      name: 'Retail Spaces BV',
+      contactName: 'Dirk Van Meerbeek',
+      email: 'd.vanmeerbeek@retailspaces.be',
+      phone: '+32 3 456 78 90',
+      type: 'Gestionnaire patrimonial',
+      status: 'active',
+      locations: [
+        { id: 'loc-002', address: 'Nationalestraat 88, 2000 Antwerpen', city: 'Antwerpen', surface: '72 m²', type: 'Cellule en galerie', availability: '2026-07-01', rent: 3200, notes: 'Dans galerie piétonne · trafic 12k/jour', status: 'under-review' },
+      ]
+    },
+    {
+      id: 'dev-003',
+      name: 'Centr\'Im',
+      contactName: 'Sophie Maes',
+      email: 's.maes@centrim.be',
+      phone: '+32 71 234 56 78',
+      type: 'Promoteur regional',
+      status: 'active',
+      locations: [
+        { id: 'loc-003', address: 'Rue de la Montagne 14, 6000 Charleroi', city: 'Charleroi', surface: '110 m²', type: 'Cellule centre-ville', availability: '2026-10-01', rent: 1900, notes: 'Rue piétonne centrale · fort flux', status: 'available' },
+        { id: 'loc-004', address: 'Place de la Digue 3, 5000 Namur', city: 'Namur', surface: '95 m²', type: 'Rez galerie', availability: '2026-08-15', rent: 2100, notes: 'Galerie couverte · parking 400 places', status: 'available' },
+      ]
+    },
+  ];
+
   // NEW BRAND / CONCEPT LEADS  → POST /consultant/new-brand-leads
   // Submitted from landing "Make Your Own Brand" CTA, routed to the
   // consultant portal under a dedicated "New Brand Concepts" section.
@@ -1262,7 +1304,7 @@
     SUPPORT_TICKETS, SUPPORT_CATEGORIES, SUPPORT_PRIORITIES,
     REGIONS, ONBOARDING_OPPORTUNITIES, LEAD_STEPS, CANDIDATE_LEADS,
     CANDIDATES, OPP_VALIDATION_STATUSES,
-    NEW_BRAND_LEADS, CONCEPT_TYPES,
+    NEW_BRAND_LEADS, CONCEPT_TYPES, DEVELOPERS,
     fmtEur, fmtNum, fmtPct,
     brandById: (id) => BRANDS.find(b => b.id === id) || null,
 

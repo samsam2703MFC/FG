@@ -716,3 +716,35 @@ body.fg-mode { background: #F4F2EC; }
   .bo-preview-grid { grid-template-columns: 1fr; }
   .bo-kpis { grid-template-columns: 1fr 1fr; }
 }
+
+/* ============ LOCATION CARD (New Opportunity modal) ============ */
+.bo-location-card {
+  background: #f8f6f3;
+  border: 1.5px solid rgba(14,27,40,.10);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 4px 0;
+}
+.bo-location-card__row {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(14,27,40,.85);
+  align-items: baseline;
+}
+.bo-location-card__label {
+  font: 600 10px/1 'DM Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: rgba(14,27,40,.45);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+.bo-location-card__note {
+  font-style: italic;
+  color: rgba(14,27,40,.55);
+  font-size: 12px;
+}
