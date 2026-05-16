@@ -37,7 +37,8 @@ const {
   CONSULTANTS,
   DEVELOPERS,
   BRAND_PORTFOLIOS,
-  REPAYMENTS
+  REPAYMENTS,
+  BENCHMARKS
 } = require('../data/seed');
 
 const router = express.Router();
@@ -228,6 +229,46 @@ router.get('/stats', (req, res) => {
         totalLeads:      CANDIDATE_LEADS.length
       },
       generatedAt: new Date().toISOString()
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/backoffice/benchmarks
+// ---------------------------------------------------------------------------
+router.get('/benchmarks', (req, res) => {
+  const { brand, period } = req.query;
+  let results = [...BENCHMARKS];
+  if (brand)  results = results.filter(b => b.brand === brand);
+  if (period) results = results.filter(b => b.period === period);
+  res.json({ data: results, meta: { total: results.length, filters: { brand: brand || null, period: period || null } } });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/backoffice/repayments
+// ---------------------------------------------------------------------------
+router.get('/repayments', (req, res) => {
+  const { investorId, brand, status, page = 1, limit = 20 } = req.query;
+  const pageNum  = parseInt(page, 10)  || 1;
+  const limitNum = parseInt(limit, 10) || 20;
+
+  let results = [...REPAYMENTS];
+  if (investorId) results = results.filter(r => r.investorId === investorId);
+  if (brand)      results = results.filter(r => r.brand === brand);
+  if (status)     results = results.filter(r => r.status === status);
+  results = results.sort((a, b) => b.date.localeCompare(a.date));
+
+  const start = (pageNum - 1) * limitNum;
+  const items = results.slice(start, start + limitNum);
+
+  res.json({
+    data: items,
+    meta: {
+      total: results.length,
+      page:  pageNum,
+      limit: limitNum,
+      pages: Math.ceil(results.length / limitNum),
+      filters: { investorId: investorId || null, brand: brand || null, status: status || null }
     }
   });
 });

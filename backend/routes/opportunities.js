@@ -3,10 +3,12 @@
 /**
  * Opportunities Routes — /api/opportunities
  *
- * GET  /api/opportunities               — list all (filterable by brand/region/status/type)
- * GET  /api/opportunities/:id           — single opportunity
- * POST /api/opportunities/:id/interest  — express interest (creates a lead)
- * GET  /api/opportunities/:id/candidates — list associated candidate leads
+ * GET  /api/opportunities                         — list all (filterable by brand/region/status/type)
+ * GET  /api/opportunities/validation-statuses     — OPP_VALIDATION_STATUSES reference list
+ * GET  /api/opportunities/:id                     — single opportunity
+ * POST /api/opportunities/:id/interest            — express interest (creates a lead)
+ * GET  /api/opportunities/:id/candidates          — list associated candidate leads
+ * GET  /api/opportunities/:id/interests           — list investor interests for an opportunity
  *
  * Query params for GET /:
  *   brand    — filter by brand id (e.g. ?brand=atelier)
@@ -31,6 +33,7 @@ const {
   FG_OPPORTUNITIES,
   CANDIDATE_LEADS,
   INVESTOR_INTERESTS,
+  OPP_VALIDATION_STATUSES,
   BRANDS,
   REGIONS
 } = require('../data/seed');
@@ -59,6 +62,13 @@ function findOpportunity(id) {
   if (financing) return { ...financing, opportunityType: 'financing' };
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/opportunities/validation-statuses
+// ---------------------------------------------------------------------------
+router.get('/validation-statuses', (req, res) => {
+  res.json({ data: OPP_VALIDATION_STATUSES, meta: { total: OPP_VALIDATION_STATUSES.length } });
+});
 
 // ---------------------------------------------------------------------------
 // GET /api/opportunities
@@ -173,6 +183,21 @@ router.get('/:id/candidates', authenticate, authorize('admin', 'consultant'), (r
   res.json({
     data: leads,
     meta: { total: leads.length, opportunityId: req.params.id }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/opportunities/:id/interests
+// ---------------------------------------------------------------------------
+router.get('/:id/interests', authenticate, authorize('admin', 'consultant'), (req, res, next) => {
+  const opp = findOpportunity(req.params.id);
+  if (!opp) return next(createError(404, `Opportunity '${req.params.id}' not found`, 'OPPORTUNITY_NOT_FOUND'));
+
+  const interests = INVESTOR_INTERESTS.filter(i => i.opportunityId === req.params.id);
+
+  res.json({
+    data: interests,
+    meta: { total: interests.length, opportunityId: req.params.id }
   });
 });
 

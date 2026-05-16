@@ -3,13 +3,14 @@
 /**
  * Leads Routes — /api/leads
  *
- * GET    /api/leads          — list (filterable by brand/region/consultant/status/priority)
- * GET    /api/leads/:id      — single lead with full history and messages
- * PUT    /api/leads/:id      — update status, notes, assignment, nextAction
- * DELETE /api/leads/:id      — soft-delete (set status to 'archived')
- *
- * Also includes pipeline steps reference:
- * GET    /api/leads/steps    — list all pipeline steps
+ * GET    /api/leads/steps          — list all pipeline steps
+ * GET    /api/leads/concept-types  — CONCEPT_TYPES reference list
+ * GET    /api/leads/new-brand      — NEW_BRAND_LEADS (admin/consultant only)
+ * POST   /api/leads/new-brand      — submit a new brand concept lead
+ * GET    /api/leads                — list (filterable by brand/region/consultant/status/priority)
+ * GET    /api/leads/:id            — single lead with full history and messages
+ * PUT    /api/leads/:id            — update status, notes, assignment, nextAction
+ * DELETE /api/leads/:id            — soft-delete (set status to 'archived')
  *
  * Query params for GET /:
  *   brand      — filter by opportunity brand
@@ -28,12 +29,15 @@
  */
 
 const express = require('express');
+const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
 const {
   CANDIDATE_LEADS,
   LEAD_STEPS,
-  ONBOARDING_OPPORTUNITIES
+  ONBOARDING_OPPORTUNITIES,
+  CONCEPT_TYPES,
+  NEW_BRAND_LEADS
 } = require('../data/seed');
 const { createError } = require('../middleware/errorHandler');
 
@@ -55,6 +59,88 @@ function paginateArray(arr, page = 1, limit = 20) {
 router.get('/steps', (req, res) => {
   res.json({ data: LEAD_STEPS, meta: { total: LEAD_STEPS.length } });
 });
+
+// ---------------------------------------------------------------------------
+// GET /api/leads/concept-types
+// ---------------------------------------------------------------------------
+router.get('/concept-types', (req, res) => {
+  res.json({ data: CONCEPT_TYPES, meta: { total: CONCEPT_TYPES.length } });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/leads/new-brand
+// ---------------------------------------------------------------------------
+router.get('/new-brand', authorize('admin', 'consultant'), (req, res) => {
+  const { status, search, page = 1, limit = 20 } = req.query;
+  const pageNum  = parseInt(page, 10)  || 1;
+  const limitNum = parseInt(limit, 10) || 20;
+
+  let results = [...NEW_BRAND_LEADS];
+
+  if (status) {
+    results = results.filter(l => l.status === status);
+  }
+  if (search) {
+    const q = search.toLowerCase();
+    results = results.filter(l =>
+      (l.projectName || '').toLowerCase().includes(q) ||
+      (l.candidate && (l.candidate.name || '').toLowerCase().includes(q))
+    );
+  }
+
+  const p = paginateArray(results, pageNum, limitNum);
+
+  res.json({
+    data: p.items,
+    meta: { total: p.total, page: p.page, limit: p.limit, pages: p.pages }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/leads/new-brand
+// ---------------------------------------------------------------------------
+router.post(
+  '/new-brand',
+  [
+    body('projectName').isString().isLength({ min: 2, max: 200 }).withMessage('Project name required'),
+    body('conceptType').isString().withMessage('Concept type required'),
+    body('candidate').isObject().withMessage('Candidate info required'),
+    body('candidate.name').isString().isLength({ min: 2 }).withMessage('Candidate name required'),
+    body('candidate.email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('description').optional().isString().isLength({ max: 2000 }),
+    body('location').optional().isString(),
+    body('budget').optional().isNumeric()
+  ],
+  (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(422).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: errors.array() });
+      }
+
+      const lead = {
+        id:          `nbl-${uuidv4().slice(0, 8)}`,
+        candidate:   req.body.candidate,
+        projectName: req.body.projectName,
+        conceptType: req.body.conceptType,
+        location:    req.body.location    || null,
+        budget:      req.body.budget      || null,
+        description: req.body.description || null,
+        inspirations: req.body.inspirations || null,
+        attachments: [],
+        status:      'to-analyse',
+        assignedTo:  null,
+        createdAt:   new Date().toISOString()
+      };
+
+      NEW_BRAND_LEADS.push(lead);
+
+      res.status(201).json({ data: lead });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // ---------------------------------------------------------------------------
 // GET /api/leads

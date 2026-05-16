@@ -3,10 +3,12 @@
 /**
  * Auth Routes — /api/auth
  *
- * POST   /api/auth/login   — email + password → JWT + user profile
- * POST   /api/auth/logout  — invalidate session (client-side; stateless JWT)
- * GET    /api/auth/me      — current authenticated user profile
- * PUT    /api/auth/me      — update current user profile
+ * POST   /api/auth/login            — email + password → JWT + user profile
+ * POST   /api/auth/logout           — invalidate session (client-side; stateless JWT)
+ * GET    /api/auth/me               — current authenticated user profile
+ * PUT    /api/auth/me               — update current user profile
+ * GET    /api/auth/me/preferences   — investor preferences for current user
+ * PUT    /api/auth/me/preferences   — update investor preferences for current user
  *
  * Example request — Login:
  *   POST /api/auth/login
@@ -27,7 +29,7 @@ const express   = require('express');
 const bcrypt    = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const { authenticate, generateToken } = require('../middleware/auth');
-const { USERS, INVESTORS, CONSULTANTS } = require('../data/seed');
+const { USERS, INVESTORS, CONSULTANTS, INVESTOR_PREFERENCES } = require('../data/seed');
 const { createError } = require('../middleware/errorHandler');
 
 const router = express.Router();
@@ -151,6 +153,62 @@ router.put(
       }
 
       res.json({ data: publicProfile(USERS[userIdx]) });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/me/preferences
+// ---------------------------------------------------------------------------
+router.get('/me/preferences', authenticate, (req, res, next) => {
+  try {
+    if (req.user.role !== 'investor' || !req.user.investorId) {
+      return next(createError(403, 'Preferences are investor-only', 'FORBIDDEN'));
+    }
+    const prefs = INVESTOR_PREFERENCES.find(p => p.investorId === req.user.investorId);
+    if (!prefs) return next(createError(404, 'Preferences not found', 'PREFERENCES_NOT_FOUND'));
+    res.json({ data: prefs });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/auth/me/preferences
+// ---------------------------------------------------------------------------
+router.put(
+  '/me/preferences',
+  authenticate,
+  [
+    body('notifications').optional().isObject(),
+    body('preferredBrands').optional().isArray(),
+    body('preferredRegions').optional().isArray(),
+    body('riskProfile').optional().isIn(['conservative', 'moderate', 'aggressive']),
+    body('currency').optional().isString().isLength({ min: 3, max: 3 }),
+    body('language').optional().isString().isLength({ min: 2, max: 5 })
+  ],
+  (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(422).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: errors.array() });
+      }
+
+      if (req.user.role !== 'investor' || !req.user.investorId) {
+        return next(createError(403, 'Preferences are investor-only', 'FORBIDDEN'));
+      }
+
+      const idx = INVESTOR_PREFERENCES.findIndex(p => p.investorId === req.user.investorId);
+      if (idx === -1) return next(createError(404, 'Preferences not found', 'PREFERENCES_NOT_FOUND'));
+
+      const updatable = ['notifications', 'preferredBrands', 'preferredRegions', 'riskProfile', 'currency', 'language'];
+      updatable.forEach(field => {
+        if (req.body[field] !== undefined) INVESTOR_PREFERENCES[idx][field] = req.body[field];
+      });
+
+      res.json({ data: INVESTOR_PREFERENCES[idx] });
     } catch (err) {
       next(err);
     }

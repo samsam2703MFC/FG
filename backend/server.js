@@ -37,6 +37,7 @@ const landingRouter       = require('./routes/landing');
 const consultantsRouter   = require('./routes/consultants');
 const developersRouter    = require('./routes/developers');
 const backofficeRouter    = require('./routes/backoffice');
+const shopsRouter         = require('./routes/shops');
 
 // ---- Error handlers ----
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -171,8 +172,21 @@ app.get('/api', (req, res) => {
       'POST   /api/developers',
       'GET    /api/developers/:id',
       'PUT    /api/developers/:id',
+      'GET    /api/auth/me/preferences',
+      'PUT    /api/auth/me/preferences',
+      'GET    /api/shops',
+      'GET    /api/shops/:id',
+      'GET    /api/shops/:id/reports',
+      'GET    /api/shops/:id/kpi',
+      'GET    /api/opportunities/validation-statuses',
+      'GET    /api/opportunities/:id/interests',
+      'GET    /api/leads/concept-types',
+      'GET    /api/leads/new-brand',
+      'POST   /api/leads/new-brand',
       'GET    /api/backoffice/dashboard',
-      'GET    /api/backoffice/stats'
+      'GET    /api/backoffice/stats',
+      'GET    /api/backoffice/benchmarks',
+      'GET    /api/backoffice/repayments'
     ]
   });
 });
@@ -194,6 +208,7 @@ app.use('/api/landing',       landingRouter);
 app.use('/api/consultants',   consultantsRouter);
 app.use('/api/developers',    developersRouter);
 app.use('/api/backoffice',    backofficeRouter);
+app.use('/api/shops',        shopsRouter);
 
 // ============================================================================
 // 404 + error handler (must be last)

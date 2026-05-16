@@ -1423,9 +1423,133 @@ const REPAYMENTS = [
 ];
 
 // ======================================================================
+// SHOP MONTHLY REPORTS
+// ======================================================================
+const SHOP_REPORTS = [
+  { id: 'rpt-001', shopId: 'atelier-chatelain', brand: 'atelier', month: '2026-04', ca: 98000, budget: 92000, vsBudget: 6.5, profit: 17.8, cust: 280, basket: 7.2, highlights: 'Meilleur mois depuis ouverture. Viennoiseries +12 %.', status: 'published' },
+  { id: 'rpt-002', shopId: 'atelier-chatelain', brand: 'atelier', month: '2026-03', ca: 91000, budget: 90000, vsBudget: 1.1, profit: 16.4, cust: 262, basket: 7.0, highlights: 'Semaine de Pâques très forte.', status: 'published' },
+  { id: 'rpt-003', shopId: 'atelier-chatelain', brand: 'atelier', month: '2026-02', ca: 84000, budget: 88000, vsBudget: -4.5, profit: 14.9, cust: 248, basket: 6.8, highlights: 'Fermeture 3 jours · réparation four principal.', status: 'published' },
+  { id: 'rpt-004', shopId: 'atelier-sablon',    brand: 'atelier', month: '2026-04', ca: 87000, budget: 84000, vsBudget: 3.6, profit: 15.2, cust: 240, basket: 7.0, highlights: 'Clientèle touristique en hausse.', status: 'published' },
+  { id: 'rpt-005', shopId: 'couq-chatelain',    brand: 'couq',    month: '2026-04', ca: 64000, budget: 60000, vsBudget: 6.7, profit: 14.2, cust: 220, basket: 6.9, highlights: 'Couque signature 38 % du CA.', status: 'published' },
+  { id: 'rpt-006', shopId: 'couq-chatelain',    brand: 'couq',    month: '2026-03', ca: 59000, budget: 58000, vsBudget: 1.7, profit: 13.1, cust: 208, basket: 6.7, highlights: 'Bon mois, légère baisse météo.', status: 'published' },
+  { id: 'rpt-007', shopId: 'cookies-outremeuse', brand: 'cookies', month: '2026-04', ca: 26800, budget: 26000, vsBudget: 3.1, profit: 9.4, cust: 86, basket: 8.9, highlights: 'Pic goûter très marqué.', status: 'published' },
+  { id: 'rpt-008', shopId: 'mania-mons',        brand: 'mania',   month: '2026-04', ca: 51200, budget: 49000, vsBudget: 4.5, profit: 13.6, cust: 240, basket: 7.4, highlights: 'Files vendredi soir, recrutement urgent.', status: 'published' }
+];
+
+// ======================================================================
+// BENCHMARKS
+// ======================================================================
+const BENCHMARKS = [
+  {
+    id: 'bench-atelier',
+    brand: 'atelier',
+    period: '2026-Q1',
+    metrics: {
+      avgCaPerShop:     88000,
+      avgProfitPct:     16.1,
+      avgCustPerDay:    258,
+      avgBasket:        7.0,
+      avgVsBudget:      3.8,
+      topShopCa:        112000,
+      bottomShopCa:     34000,
+      networkMedianCa:  91000
+    },
+    benchmark: {
+      sectorAvgCa:        75000,
+      sectorAvgProfitPct: 13.5,
+      sectorAvgBasket:    6.2
+    }
+  },
+  {
+    id: 'bench-couq',
+    brand: 'couq',
+    period: '2026-Q1',
+    metrics: {
+      avgCaPerShop:     56000,
+      avgProfitPct:     13.0,
+      avgCustPerDay:    194,
+      avgBasket:        6.8,
+      avgVsBudget:      4.2,
+      topShopCa:        64000,
+      bottomShopCa:     48000,
+      networkMedianCa:  56000
+    },
+    benchmark: {
+      sectorAvgCa:        52000,
+      sectorAvgProfitPct: 11.8,
+      sectorAvgBasket:    6.0
+    }
+  },
+  {
+    id: 'bench-cookies',
+    brand: 'cookies',
+    period: '2026-Q1',
+    metrics: {
+      avgCaPerShop:     26800,
+      avgProfitPct:     9.4,
+      avgCustPerDay:    86,
+      avgBasket:        8.9,
+      avgVsBudget:      3.1,
+      topShopCa:        26800,
+      bottomShopCa:     26800,
+      networkMedianCa:  26800
+    },
+    benchmark: {
+      sectorAvgCa:        24000,
+      sectorAvgProfitPct: 8.0,
+      sectorAvgBasket:    7.8
+    }
+  },
+  {
+    id: 'bench-mania',
+    brand: 'mania',
+    period: '2026-Q1',
+    metrics: {
+      avgCaPerShop:     51200,
+      avgProfitPct:     13.6,
+      avgCustPerDay:    240,
+      avgBasket:        7.4,
+      avgVsBudget:      4.5,
+      topShopCa:        51200,
+      bottomShopCa:     51200,
+      networkMedianCa:  51200
+    },
+    benchmark: {
+      sectorAvgCa:        44000,
+      sectorAvgProfitPct: 11.0,
+      sectorAvgBasket:    6.8
+    }
+  }
+];
+
+// ======================================================================
 // INVESTOR INTEREST EXPRESSIONS
 // ======================================================================
 const INVESTOR_INTERESTS = [];
+
+// ======================================================================
+// INVESTOR PREFERENCES
+// ======================================================================
+const INVESTOR_PREFERENCES = [
+  {
+    investorId: 'inv-001',
+    notifications: { repayments: true, newOpportunities: true, monthlyReports: true, supportUpdates: false },
+    preferredBrands: ['atelier', 'couq'],
+    preferredRegions: ['bxl', 'fla'],
+    riskProfile: 'moderate',
+    currency: 'EUR',
+    language: 'fr'
+  },
+  {
+    investorId: 'inv-002',
+    notifications: { repayments: true, newOpportunities: false, monthlyReports: true, supportUpdates: true },
+    preferredBrands: [],
+    preferredRegions: [],
+    riskProfile: 'conservative',
+    currency: 'EUR',
+    language: 'fr'
+  }
+];
 
 module.exports = {
   BRANDS,
@@ -1453,7 +1577,10 @@ module.exports = {
   LANDING,
   USERS,
   REPAYMENTS,
-  INVESTOR_INTERESTS
+  INVESTOR_INTERESTS,
+  INVESTOR_PREFERENCES,
+  SHOP_REPORTS,
+  BENCHMARKS
 };
 
 // Script entry: print a summary when run directly
