@@ -2162,6 +2162,396 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
 # ---------------------------------------------------------------------------
+# SHOPS
+# ---------------------------------------------------------------------------
+  /shops:
+    get:
+      summary: List all shops (flat, cross-brand)
+      tags: [Shops]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: brandId
+          schema: { type: string }
+        - in: query
+          name: region
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, closed, in-construction] }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Paginated shop list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedList' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /shops/{id}:
+    get:
+      summary: Get shop detail
+      tags: [Shops]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Shop detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Shop' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /shops/{id}/reports:
+    get:
+      summary: Monthly reports for a shop
+      tags: [Shops]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: month
+          schema: { type: string, example: '2026-01' }
+      responses:
+        '200':
+          description: List of monthly reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        shopId: { type: string }
+                        month: { type: string }
+                        revenue: { type: number }
+                        foodCost: { type: number }
+                        labourCost: { type: number }
+                        profit: { type: number }
+                        customersPerDay: { type: number }
+                        basketAvg: { type: number }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /shops/{id}/kpi:
+    get:
+      summary: Latest KPI snapshot for a shop
+      tags: [Shops]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: KPI snapshot derived from latest report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      shopId: { type: string }
+                      month: { type: string }
+                      revenue: { type: number }
+                      foodCost: { type: number }
+                      labourCost: { type: number }
+                      profit: { type: number }
+
+# ---------------------------------------------------------------------------
+# OPPORTUNITIES — extra paths
+# ---------------------------------------------------------------------------
+  /opportunities/validation-statuses:
+    get:
+      summary: List all opportunity validation statuses
+      tags: [Opportunities]
+      responses:
+        '200':
+          description: Array of status objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        label: { type: string }
+                        color: { type: string }
+
+  /opportunities/{id}/interests:
+    get:
+      summary: List investor interests for an opportunity
+      tags: [Opportunities]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of investor interest records
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedList' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ---------------------------------------------------------------------------
+# LEADS — extra paths
+# ---------------------------------------------------------------------------
+  /leads/concept-types:
+    get:
+      summary: List concept types for new brand leads
+      tags: [Leads]
+      responses:
+        '200':
+          description: Array of concept type objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        label: { type: string }
+
+  /leads/new-brand:
+    get:
+      summary: List new brand concept leads (admin/consultant)
+      tags: [Leads]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Paginated new-brand lead list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedList' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      summary: Submit a new brand concept lead
+      tags: [Leads]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, conceptType]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                conceptType: { type: string }
+                description: { type: string }
+                phone: { type: string }
+      responses:
+        '201':
+          description: Lead created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+# ---------------------------------------------------------------------------
+# AUTH — preferences
+# ---------------------------------------------------------------------------
+  /auth/me/preferences:
+    get:
+      summary: Get current investor preferences
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Investor preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      notifications: { type: boolean }
+                      preferredBrands: { type: array, items: { type: string } }
+                      preferredRegions: { type: array, items: { type: string } }
+                      riskProfile: { type: string, enum: [conservative, balanced, growth] }
+                      currency: { type: string }
+                      language: { type: string }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      summary: Update investor preferences
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notifications: { type: boolean }
+                preferredBrands: { type: array, items: { type: string } }
+                preferredRegions: { type: array, items: { type: string } }
+                riskProfile: { type: string, enum: [conservative, balanced, growth] }
+                currency: { type: string }
+                language: { type: string }
+      responses:
+        '200':
+          description: Updated preferences
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ---------------------------------------------------------------------------
+# BACKOFFICE — extra paths
+# ---------------------------------------------------------------------------
+  /backoffice/benchmarks:
+    get:
+      summary: Network benchmarks per brand and period
+      tags: [Backoffice]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: brand
+          schema: { type: string }
+        - in: query
+          name: period
+          schema: { type: string, example: 'Q1-2026' }
+      responses:
+        '200':
+          description: Benchmark data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /backoffice/repayments:
+    get:
+      summary: Admin flat list of all investor repayments
+      tags: [Backoffice]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: investorId
+          schema: { type: string }
+        - in: query
+          name: brand
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [scheduled, paid, late, pending] }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Paginated repayment list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedList' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /regions:
+    get:
+      summary: List all regions
+      tags: [Regions]
+      responses:
+        '200':
+          description: Region list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        country: { type: string }
+
+  /regions/{id}:
+    get:
+      summary: Get region detail with opportunity and shop counts
+      tags: [Regions]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Region detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      name: { type: string }
+                      opportunityCount: { type: integer }
+                      shopCount: { type: integer }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ---------------------------------------------------------------------------
 # COMPONENTS
 # ---------------------------------------------------------------------------
 components:
