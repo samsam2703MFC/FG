@@ -1271,6 +1271,7 @@ function ModalNewOpportunity({ ctx, onClose }) {
   const [brand,     setBrand]     = bState(FG.BRANDS[0].id);
   const [devId,     setDevId]     = bState('');
   const [locId,     setLocId]     = bState('');
+  const [budget,    setBudget]    = bState('');
   const [ticketMin, setTicketMin] = bState('');
   const [ticketMax, setTicketMax] = bState('');
   const [roiTarget, setRoiTarget] = bState('');
@@ -1361,6 +1362,9 @@ function ModalNewOpportunity({ ctx, onClose }) {
       )}
 
       {/* Financial details */}
+      <BoField label="Approximate total budget (€)">
+        <input type="number" value={budget} onChange={e => setBudget(e.target.value)} placeholder="180 000" />
+      </BoField>
       <div className="bo-form-row">
         <BoField label="Min ticket (€)">
           <input type="number" value={ticketMin} onChange={e => setTicketMin(e.target.value)} placeholder="25 000" />
