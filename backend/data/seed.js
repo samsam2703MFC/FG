@@ -1580,7 +1580,9 @@ module.exports = {
   INVESTOR_INTERESTS,
   INVESTOR_PREFERENCES,
   SHOP_REPORTS,
-  BENCHMARKS
+  BENCHMARKS,
+  SHARE_CLASSES,
+  BRANDS_FULL,
 };
 
 // Script entry: print a summary when run directly
@@ -1602,3 +1604,198 @@ if (require.main === module) {
   console.log('=========================================');
   console.log('Seed OK — all data loaded.');
 }
+
+// ======================================================================
+// SHARE CLASSES — specific rights per class
+// ======================================================================
+const SHARE_CLASSES = [
+  {
+    id: 'A',
+    label: 'Class A — Founders',
+    description: 'Voting shares held by founding partners. 10× voting multiplier.',
+    votingMultiplier: 10,
+    dividendPriority: 2,
+    liquidationPriority: 2,
+    transferRestrictions: 'Right of first refusal — other Class A holders',
+    notes: 'Reserved for founders and core operators',
+  },
+  {
+    id: 'B',
+    label: 'Class B — Investors',
+    description: 'Non-voting shares for financial investors. Priority dividend.',
+    votingMultiplier: 0,
+    dividendPriority: 1,
+    liquidationPriority: 1,
+    transferRestrictions: 'Board approval required',
+    notes: 'Preferred return: 8% pa before Class A dividends',
+  },
+  {
+    id: 'C',
+    label: 'Class C — Ecosystem Partners',
+    description: 'Shares issued to FG ecosystem entities (suppliers, RE partners).',
+    votingMultiplier: 1,
+    dividendPriority: 3,
+    liquidationPriority: 3,
+    transferRestrictions: 'FG approval required; non-transferable outside ecosystem',
+    notes: 'Anti-dilution ratchet if revenue < target after 3 years',
+  },
+  {
+    id: 'D',
+    label: 'Class D — Employee / Advisory',
+    description: 'Equity compensation for key staff and advisors. Vesting schedule.',
+    votingMultiplier: 1,
+    dividendPriority: 4,
+    liquidationPriority: 4,
+    transferRestrictions: '4-year vest, 1-year cliff. Lapse on departure.',
+    notes: 'ESOP pool — board authorises individual grants',
+  },
+];
+
+// ======================================================================
+// BRANDS_FULL — extended brand records (all 8 sections)
+// ======================================================================
+const BRANDS_FULL = [
+  {
+    id: 'atelier',
+    // ── 1. Identity ──────────────────────────────────────────────────
+    name: "L'Atelier By",
+    legalName: "L'Atelier By SRL",
+    slug: 'latelier-by',
+    status: 'active',
+    yearFounded: 2022,
+    countryOfOrigin: 'BE',
+    tagline: { fr: "Boulangerie de quartier · Belgique", nl: "Buurtbakkerij · België", en: "Neighbourhood bakery · Belgium", pl: "Piekarnia sąsiedzka · Belgia" },
+    story: {
+      fr: "L'Atelier By est né d'une conviction simple : une boulangerie artisanale de qualité doit être accessible dans chaque quartier. Fondée à Bruxelles en 2022, la marque combine savoir-faire traditionnel et design contemporain.",
+      nl: "L'Atelier By ontstond vanuit een eenvoudige overtuiging: een ambachtelijke kwaliteitsbakkerij moet in elke buurt bereikbaar zijn.",
+      en: "L'Atelier By was born from a simple conviction: quality artisan bakeries should be accessible in every neighbourhood.",
+      pl: "L'Atelier By powstało z prostego przekonania: rzemieślnicze piekarnie wysokiej jakości powinny być dostępne w każdej okolicy.",
+    },
+
+    // ── 2. Visual identity ───────────────────────────────────────────
+    visual: {
+      logos: { main: 'img/logo.png', monoBlack: null, monoWhite: null, icon: null },
+      palette: {
+        primary:   { hex: '#8D1D2C', name: 'Ruby Red' },
+        secondary: { hex: '#F2C9A0', name: 'Warm Sand' },
+        accent:    [{ hex: '#C9A96E', name: 'Honey Gold' }],
+        neutrals:  [{ hex: '#EAE4DC', name: 'Linen' }, { hex: '#1C1A17', name: 'Espresso' }],
+      },
+      typography: {
+        display: { name: 'DM Sans', weights: [400, 500, 700], source: 'google', url: 'https://fonts.google.com/specimen/DM+Sans' },
+        body:    { name: 'DM Sans', weights: [400, 500], source: 'google', url: 'https://fonts.google.com/specimen/DM+Sans' },
+      },
+      photographyStyle: 'Warm, natural light. Textured surfaces (linen, wood, stone). Close-up textures of bread and pastries.',
+      materialsTextures: [
+        { name: 'Brushed oak', description: 'Counter and shelving material', referenceImage: null },
+        { name: 'Ruby microcement', description: 'Feature walls and floor accents', referenceImage: null },
+        { name: 'Raw linen', description: 'Packaging and staff uniforms', referenceImage: null },
+      ],
+      guidelinesPdf: null,
+    },
+
+    // ── 3. Positioning ───────────────────────────────────────────────
+    positioning: {
+      promise:          { fr: "Du pain vrai, chaque jour.", nl: "Echt brood, elke dag.", en: "Real bread, every day.", pl: "Prawdziwy chleb, każdego dnia." },
+      valueProposition: { fr: "Une boulangerie artisanale premium, franchisée et réplicable à l'échelle d'un réseau.", nl: "Een premium ambachtelijke bakkerij, gefranchiseerd en schaalbaar.", en: "A premium artisan bakery, franchised and replicable at network scale.", pl: "Premium rzemieślnicza piekarnia, skalowalna w modelu franczyzowym." },
+      personas: [
+        { name: 'Le Voisin Fidèle', ageRange: '30–55', description: 'Habitant du quartier, vient chaque matin, attaché à la qualité et à l\'authenticité.' },
+        { name: 'Le Professionnel Pressé', ageRange: '25–45', description: 'Cherche un déjeuner rapide et qualitatif. Sensible à l\'esthétique du lieu.' },
+      ],
+      marketSegment: 'bakery',
+      differentiators: [
+        'Pâtes à fermentation lente (24–48h)',
+        'Design d\'intérieur signé par une agence bruxelloise',
+        'Packaging éco-responsable et cohérent',
+        'Réseau de producteurs locaux certifiés',
+      ],
+      competitors: [
+        { name: 'Maison Dandoy', website: 'maisondandoy.com', notes: 'Heritage brand, tourist-facing, not franchised' },
+        { name: 'Paul', website: 'paul.fr', notes: 'Large franchise, industrial quality, low premium perception' },
+      ],
+    },
+
+    // ── 4. Operations ────────────────────────────────────────────────
+    operations: {
+      businessModel: 'franchise',
+      storeFormat: 'boutique',
+      productionModel: 'hybrid',
+      centralProductionUnit: 'ProdAtelier-Bxl',
+      storeSizeMin: 80, storeSizeMax: 200,
+      staffMin: 4, staffMax: 12,
+      requiredPositions: ['Boulanger-pâtissier', 'Manager de point de vente', 'Vendeur(se)'],
+      operationsManual: null,
+      keySupplierCategories: ['Farines bio', 'Beurre AOP', 'Fruits de saison', 'Emballages compostables'],
+    },
+
+    // ── 5. Financials ────────────────────────────────────────────────
+    financials: {
+      currency: 'EUR',
+      avgTicket: 8.5,
+      dailyRevenueTarget: 2500,
+      monthlyRevenueTarget: 75000,
+      grossMarginTarget: 65,
+      ebitdaTarget: 18,
+      royaltyRate: 6,
+      marketingFund: 2,
+      franchiseFee: 25000,
+      investmentMin: 180000,
+      investmentMax: 320000,
+      workingCapital: 30000,
+      breakEvenMonths: 18,
+      roiTargetMonths: 48,
+    },
+
+    // ── 6. Legal ─────────────────────────────────────────────────────
+    legal: {
+      ownerEntity: 'Franchise Generation SRL',
+      trademarkStatus: 'registered',
+      trademarkTerritories: ['BE', 'FR', 'LU', 'NL'],
+      trademarkNumbers: [
+        { country: 'BE', number: 'BE-TM-2022-08341', date: '2022-09-01' },
+        { country: 'EU', number: 'EUTM-2023-01872', date: '2023-03-15' },
+      ],
+      capTable: [
+        { shareholder: 'Sam Verheyden', shareClass: 'A', percentage: 51, votingRights: true },
+        { shareholder: 'FG Investor Pool', shareClass: 'B', percentage: 35, votingRights: false },
+        { shareholder: 'ProdAtelier SRL', shareClass: 'C', percentage: 9, votingRights: true },
+        { shareholder: 'Management ESOP', shareClass: 'D', percentage: 5, votingRights: true },
+      ],
+      masterFranchiseHolder: null,
+      territoryRights: [
+        { territory: 'Belgium', holder: 'Franchise Generation SRL', exclusivity: true },
+        { territory: 'France', holder: null, exclusivity: false },
+      ],
+    },
+
+    // ── 7. Network & growth ──────────────────────────────────────────
+    network: {
+      activeLocations: 5,
+      locationsByCountry: { BE: 5 },
+      target1Year: 8,
+      target3Year: 20,
+      target5Year: 50,
+      pipelineOpportunityIds: ['opp-1', 'opp-3'],
+    },
+
+    // ── 8. Meta ──────────────────────────────────────────────────────
+    meta: {
+      createdBy: 'admin@fg.be',
+      createdAt: '2024-01-15T10:00:00.000Z',
+      updatedAt: '2026-05-01T14:00:00.000Z',
+      brandManager: 'sophie.renard@fg.be',
+      internalNotes: 'Flagship brand. All network decisions go through Sam.',
+      draftSavedAt: null,
+      publishedAt: '2024-02-01T09:00:00.000Z',
+    },
+
+    // ── Tokens (kept for UI compatibility) ───────────────────────────
+    tokens: {
+      primary: '#8D1D2C', secondary: '#F2C9A0',
+      ink: '#1c1a17', bg: '#EAE4DC', surface: '#FFFFFF', accent: '#8D1D2C',
+      fontDisplay: '"DM Sans", system-ui, sans-serif',
+      fontUi:      '"DM Sans", system-ui, sans-serif',
+      fontAccent:  '"DM Sans", system-ui, sans-serif',
+    },
+  },
+];

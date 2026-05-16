@@ -438,7 +438,7 @@ function BoBrands({ ctx }) {
         actions={(
           <>
             <button className="bo-btn bo-btn--ghost" onClick={() => toast('info', 'Import wizard coming soon.')}>Import</button>
-            <button className="bo-btn bo-btn--primary" onClick={() => openModal('new-brand')}><BoIcon.plus />New brand</button>
+            <a className="bo-btn bo-btn--primary" href="brand-create.html"><BoIcon.plus />New brand</a>
           </>
         )}
       />
