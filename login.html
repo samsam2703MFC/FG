@@ -50,7 +50,7 @@ function App() {
   const [portal, setPortal] = useState(initPortal);
   const target = PORTAL_TARGETS[portal];
 
-  const [email, setEmail] = useState('claire.vermeulen@example.com');
+  const [email, setEmail] = useState('');
   const [code, setCode]   = useState('');
   const [phase, setPhase] = useState('email'); // 'email' | 'code'
   const [loading, setLoading] = useState(false);
@@ -85,7 +85,7 @@ function App() {
       // Demo mode — code is pre-filled
     }
 
-    setCode('123456');
+    setCode('');
     setPhase('code');
     setLoading(false);
   };
@@ -141,20 +141,6 @@ function App() {
 
       <main className="lg__main lg__main--centered">
         <section className="lg__card">
-          {/* Portal switcher */}
-          <div className="lg__portal-tabs">
-            {Object.entries(PORTAL_TARGETS).map(([key, p]) => (
-              <button
-                key={key}
-                type="button"
-                className={'lg__portal-tab' + (portal === key ? ' lg__portal-tab--active' : '')}
-                onClick={() => { setPortal(key); setError(''); }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
           <p className="lg__card-eyebrow">Sign in · {target.tag}</p>
           <h2 className="lg__card-h">
             {phase === 'email' ? 'Welcome to Franchise Generation' : 'Check your inbox'}
@@ -189,7 +175,7 @@ function App() {
                   required autoFocus
                   placeholder="123456"
                 />
-                <p className="lg__hint">Demo: the code is pre-filled — just hit Continue.</p>
+                <p className="lg__hint">Enter the 6-digit code sent to your email.</p>
               </div>
             )}
 
