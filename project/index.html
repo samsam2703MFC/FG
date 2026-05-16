@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Franchise Generation — Espace investisseur</title>
+<link rel="stylesheet" href="portal.css" />
+<link rel="stylesheet" href="fg.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Data: FG (multi-brand) loaded first; legacy portal-data extends with L'Atelier By shops -->
+<script src="fg-data.js"></script>
+<script src="portal-data.js"></script>
+
+<!-- React layer -->
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="portal-charts.jsx"></script>
+<script type="text/babel" src="portal-views.jsx"></script>
+<script type="text/babel" src="fg-shell.jsx"></script>
+<script type="text/babel" src="brand-views.jsx"></script>
+<script type="text/babel" src="brand-presentation.jsx"></script>
+<script type="text/babel" src="fg-profile.jsx"></script>
+<script type="text/babel" src="fg-helpdesk.jsx"></script>
+<script type="text/babel" src="fg-landing.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useMemo, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "chartKind": "bar",
+  "logged": true,
+  "scope": "atelier",
+  "section": "presentation",
+  "showWelcomeToast": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+  const [logged, setLogged] = useState(tweaks.logged !== false);
+  const [route, setRoute] = useState({
+    scope: tweaks.scope || 'fg',
+    section: tweaks.section || 'dashboard',
+    shopId: null
+  });
+  const [toast, setToast] = useState({ brand: null, visible: false });
+  const FG = window.FG_DATA;
+  const A = window.PORTAL_DATA;
+
+  // Apply theme class on body. fg-mode = use FG shell.
+  useEffect(() => {
+    document.body.classList.add('fg-mode');
+    document.body.classList.remove('theme-atelier', 'theme-couq', 'theme-cookies', 'theme-mania');
+    if (route.scope === 'fg') {
+      // No specific brand theme — FG neutral
+    } else {
+      document.body.classList.add('theme-' + route.scope);
+    }
+  }, [route.scope]);
+
+  // Welcome toast on brand entry
+  useEffect(() => {
+    if (route.scope === 'fg' || !tweaks.showWelcomeToast) {
+      setToast({ brand: null, visible: false });
+      return;
+    }
+    const brand = FG.brandById(route.scope);
+    setToast({ brand, visible: true });
+    const t = setTimeout(() => setToast(s => ({ ...s, visible: false })), 2400);
+    return () => clearTimeout(t);
+  }, [route.scope, tweaks.showWelcomeToast]);
+
+  if (!logged) {
+    // Investor portal entry is gated by a minimal login screen; the public
+    // marketing site lives in landing.html.
+    return (
+      <>
+        <LoginScreen onLogin={() => { setLogged(true); setTweak('logged', true); }} />
+        <TweaksUI tweaks={tweaks} setTweak={setTweak} />
+      </>
+    );
+  }
+
+  const brand = route.scope !== 'fg' ? FG.brandById(route.scope) : null;
+  const goTo = (scope, section, shopId = null) => {
+    setRoute({ scope, section, shopId });
+    setTweak({ scope, section });
+  };
+
+  // Nav definitions
+  const fgNav = [
+    { id: 'dashboard',    label: 'Tableau de bord', icon: <FgIcon.dashboard /> },
+    { id: 'portfolio',    label: 'Mon portefeuille', icon: <FgIcon.portfolio />, count: A.PROJECTS.length + Object.values(FG.BRAND_PORTFOLIOS).reduce((a, b) => a + b.shops.length, 0) },
+    { id: 'opportunites', label: 'Opportunités', icon: <FgIcon.opp />, count: FG.FG_OPPORTUNITIES.length }
+  ];
+
+  const unread = FG.FG_NOTIFS.filter(n => n.unread).length;
+
+  // ============ ROUTER ============
+  const renderContent = () => {
+    if (route.scope === 'fg') {
+      switch (route.section) {
+        case 'dashboard':    return <FgDashboard goTo={goTo} fgData={FG} />;
+        case 'portfolio':    return <FgPortfolio goTo={goTo} fgData={FG} />;
+        case 'opportunites': return <FgOpportunities goTo={goTo} fgData={FG} />;
+        case 'documents':    return <FgProfile goTo={goTo} fgData={FG} />;
+        case 'notifications':return <FgNotifications goTo={goTo} fgData={FG} />;
+        case 'profil':       return <FgProfile goTo={goTo} fgData={FG} />;
+        default:             return <FgDashboard goTo={goTo} fgData={FG} />;
+      }
+    }
+    // BRAND SCOPE
+    if (route.section === 'presentation') {
+      return <BrandPresentation brand={brand} goTo={goTo} fgData={FG} />;
+    }
+    if (route.scope === 'atelier') {
+      // Route to legacy L'Atelier By views (they bring their own .content padding)
+      if (route.shopId && (route.section === 'magasins' || route.section === 'dashboard')) {
+        const project = A.PROJECTS.find(p => p.id === route.shopId);
+        if (project) {
+          return <MagasinDetail project={project} chartKind={tweaks.chartKind} onBack={() => goTo('atelier', 'magasins')} />;
+        }
+      }
+      switch (route.section) {
+        case 'dashboard':
+          return <Dashboard projects={A.PROJECTS} chartKind={tweaks.chartKind}
+            onSelectProject={(id) => goTo('atelier', 'magasins', id)} onNav={(s) => goTo('atelier', s)} />;
+        case 'magasins':
+          return <MagasinsList projects={A.PROJECTS} onSelect={(id) => goTo('atelier', 'magasins', id)} />;
+        case 'opportunites':
+          return <BrandOpportunities brand={brand} goTo={goTo} fgData={FG} />;
+        default:
+          return <Dashboard projects={A.PROJECTS} chartKind={tweaks.chartKind}
+            onSelectProject={(id) => goTo('atelier', 'magasins', id)} onNav={(s) => goTo('atelier', s)} />;
+      }
+    }
+    // Couq / Cookies / Mania (new brands)
+    if (route.shopId) {
+      const shop = FG.BRAND_PORTFOLIOS[route.scope]?.shops.find(s => s.id === route.shopId);
+      if (shop) return <BrandShopDetail shop={shop} brand={brand} goTo={goTo} fgData={FG} />;
+    }
+    switch (route.section) {
+      case 'opportunites': return <BrandOpportunities brand={brand} goTo={goTo} fgData={FG} />;
+      case 'shops':
+      case 'dashboard':
+      default:             return <BrandDashboard brand={brand} goTo={goTo} fgData={FG} />;
+    }
+  };
+
+  return (
+    <>
+      <div className="shell" style={{ gridTemplateColumns: '256px 1fr' }}>
+        <FgSidebar scope={route.scope} brand={brand} route={route} goTo={goTo}
+          fgNav={fgNav} brands={FG.BRANDS} fgData={FG} />
+        <main className="shell__main">
+          <FgTopbar scope={route.scope} brand={brand} route={route} goTo={goTo} unread={unread} />
+          <FgBrandTabs scope={route.scope} brand={brand} route={route} goTo={goTo} fgData={FG} />
+          {renderContent()}
+        </main>
+      </div>
+
+      <FgToast brand={toast.brand} visible={toast.visible} />
+      <FgHelpdesk fgData={FG} />
+
+      <TweaksUI tweaks={tweaks} setTweak={setTweak} fgData={FG} goTo={goTo} />
+    </>
+  );
+}
+
+function TweaksUI({ tweaks, setTweak, fgData, goTo }) {
+  const { TweaksPanel, TweakSection, TweakRadio, TweakToggle, TweakSelect } = window;
+  if (!fgData) {
+    return (
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Session">
+          <TweakToggle label="Connecté" value={tweaks.logged !== false} onChange={(v) => setTweak('logged', v)} />
+        </TweakSection>
+      </TweaksPanel>
+    );
+  }
+  return (
+    <TweaksPanel title="Tweaks">
+      <TweakSection title="Navigation rapide">
+        <TweakSelect
+          label="Contexte"
+          value={tweaks.scope || 'fg'}
+          onChange={(v) => { setTweak('scope', v); setTweak('section', 'dashboard'); goTo && goTo(v, 'dashboard'); }}
+          options={[
+            { value: 'fg',      label: 'Franchise Generation (global)' },
+            { value: 'atelier', label: "L'Atelier By" },
+            { value: 'couq',    label: 'Couq' },
+            { value: 'cookies', label: "Cookie's & Milk" },
+            { value: 'mania',   label: 'Mania Pizza' }
+          ]}
+        />
+      </TweakSection>
+      <TweakSection title="Multi-brand">
+        <TweakToggle
+          label="Toast 'écosystème' à l'entrée"
+          value={tweaks.showWelcomeToast !== false}
+          onChange={(v) => setTweak('showWelcomeToast', v)}
+        />
+      </TweakSection>
+      <TweakSection title="Style des graphiques">
+        <TweakRadio
+          label="Type"
+          value={tweaks.chartKind}
+          onChange={(v) => setTweak('chartKind', v)}
+          options={[
+            { value: 'line', label: 'Lignes' },
+            { value: 'area', label: 'Aires' },
+            { value: 'bar',  label: 'Barres' }
+          ]}
+        />
+      </TweakSection>
+      <TweakSection title="Session">
+        <TweakToggle
+          label="Connecté"
+          value={tweaks.logged !== false}
+          onChange={(v) => setTweak('logged', v)}
+        />
+      </TweakSection>
+    </TweaksPanel>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

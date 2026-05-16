@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Franchise Generation — Consultant pipeline</title>
+<link rel="stylesheet" href="fg.css" />
+</head>
+<body class="fg-mode">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="fg-data.js"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useMemo } = React;
+const FG = window.FG_DATA;
+
+// Bucket steps into 4 high-level columns for the kanban
+const COL_MAP = {
+  'interested':            { col: 'new',       label: 'New leads' },
+  'consultant-review':     { col: 'new',       label: 'New leads' },
+  'first-contact-planned': { col: 'contact',   label: 'Contact phase' },
+  'first-contact-done':    { col: 'contact',   label: 'Contact phase' },
+  'financing-precheck':    { col: 'validation', label: 'Validation' },
+  'location-validation':   { col: 'validation', label: 'Validation' },
+  'business-plan':         { col: 'validation', label: 'Validation' },
+  'committee':             { col: 'committee', label: 'Committee & closing' },
+  'contract-prep':         { col: 'committee', label: 'Committee & closing' },
+  'training-planning':     { col: 'committee', label: 'Committee & closing' },
+  'opening-planning':      { col: 'committee', label: 'Committee & closing' }
+};
+const COLS = [
+  { id: 'new',       label: 'New leads' },
+  { id: 'contact',   label: 'Contact phase' },
+  { id: 'validation', label: 'Validation' },
+  { id: 'committee', label: 'Committee & closing' }
+];
+
+function App() {
+  const initialTab = new URLSearchParams(window.location.search).get('tab') === 'new-brands' ? 'new-brands' : 'leads';
+  const [tab, setTab]           = useState(initialTab);
+  const [brand, setBrand]       = useState('all');
+  const [region, setRegion]     = useState('all');
+  const [consultant, setCons]   = useState('all');
+  const [status, setStatus]     = useState('all');
+  const [query, setQuery]       = useState('');
+
+  const consultants = useMemo(() => {
+    const set = new Set(FG.CANDIDATE_LEADS.map(l => l.assignedTo.name));
+    return Array.from(set);
+  }, []);
+
+  const leads = FG.CANDIDATE_LEADS.filter(l => {
+    if (brand !== 'all') {
+      const opp = FG.ONBOARDING_OPPORTUNITIES.find(o => o.id === l.opportunity);
+      if (!opp || opp.brand !== brand) return false;
+    }
+    if (region !== 'all') {
+      const opp = FG.ONBOARDING_OPPORTUNITIES.find(o => o.id === l.opportunity);
+      if (!opp || opp.region !== region) return false;
+    }
+    if (consultant !== 'all' && l.assignedTo.name !== consultant) return false;
+    if (status !== 'all' && COL_MAP[l.currentStep]?.col !== status) return false;
+    if (query) {
+      const q = query.toLowerCase();
+      if (!l.candidate.name.toLowerCase().includes(q) && !(FG.ONBOARDING_OPPORTUNITIES.find(o => o.id === l.opportunity)?.name || '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const byCol = COLS.map(c => ({ ...c, leads: leads.filter(l => COL_MAP[l.currentStep]?.col === c.id) }));
+
+  return (
+    <div className="cs">
+      <div className="cs-shell">
+        {/* Sidebar */}
+        <aside className="cs-side">
+          <img src="img/fg-logo.png" alt="Franchise Generation" className="cs-side__logo" />
+          <p className="cs-side__section">Workspace</p>
+          <div className={'cs-side__item' + (tab === 'leads' ? ' is-active' : '')} onClick={() => setTab('leads')}>Candidate leads</div>
+          <div className={'cs-side__item' + (tab === 'new-brands' ? ' is-active' : '')} onClick={() => setTab('new-brands')}>
+            New Brand Concepts
+            {FG.NEW_BRAND_LEADS.length > 0 && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', padding: '2px 6px', borderRadius: 999, background: '#9c2a1f', color: '#fff' }}>{FG.NEW_BRAND_LEADS.length}</span>}
+          </div>
+          <div className="cs-side__item">Brands & shops</div>
+          <div className="cs-side__item">Opportunities</div>
+          <div className="cs-side__item">Investors</div>
+          <p className="cs-side__section" style={{ marginTop: 24 }}>Account</p>
+          <div className="cs-side__item">My profile</div>
+          <div className="cs-side__item">Settings</div>
+        </aside>
+
+        {/* Main */}
+        <main className="cs-main">
+          {tab === 'new-brands' ? <NewBrandsView /> : <LeadsView />}
+        </main>
+      </div>
+    </div>
+  );
+
+  function LeadsView() {
+    return (<>
+          <header className="cs-head">
+            <p className="cs-head__eyebrow">Consultant workspace</p>
+            <h1 className="cs-head__title">Candidate leads pipeline</h1>
+            <p style={{ fontSize: 13, color: 'rgba(14,27,40,0.65)', margin: '6px 0 0' }}>
+              {leads.length} active lead{leads.length > 1 ? 's' : ''} across {FG.BRANDS.length} brands.
+            </p>
+          </header>
+
+          {/* Filters */}
+          <div className="cs-filters">
+            <div className="cs-filter">
+              <label>Search</label>
+              <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Candidate or opportunity…" />
+            </div>
+            <div className="cs-filter">
+              <label>Brand</label>
+              <select value={brand} onChange={(e) => setBrand(e.target.value)}>
+                <option value="all">All brands</option>
+                {FG.BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div className="cs-filter">
+              <label>Region</label>
+              <select value={region} onChange={(e) => setRegion(e.target.value)}>
+                <option value="all">All regions</option>
+                {FG.REGIONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+              </select>
+            </div>
+            <div className="cs-filter">
+              <label>Consultant</label>
+              <select value={consultant} onChange={(e) => setCons(e.target.value)}>
+                <option value="all">All consultants</option>
+                {consultants.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="cs-filter">
+              <label>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="all">All statuses</option>
+                {COLS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </div>
+            <button className="lp-btn lp-btn--ghost lp-btn--sm" style={{ marginLeft: 'auto' }} onClick={() => { setBrand('all'); setRegion('all'); setCons('all'); setStatus('all'); setQuery(''); }}>Reset</button>
+          </div>
+
+          {/* Kanban */}
+          <div className="cs-kanban">
+            {byCol.map(c => (
+              <div key={c.id} className="cs-col">
+                <div className="cs-col__head">
+                  <p className="cs-col__title">{c.label}</p>
+                  <span className="cs-col__count">{c.leads.length}</span>
+                </div>
+                {c.leads.length === 0 && (
+                  <p style={{ fontSize: 11, color: 'rgba(14,27,40,0.45)', textAlign: 'center', padding: '20px 0' }}>No lead.</p>
+                )}
+                {c.leads.map(l => {
+                  const opp = FG.ONBOARDING_OPPORTUNITIES.find(o => o.id === l.opportunity);
+                  const b = FG.brandById(opp.brand);
+                  const region = FG.REGIONS.find(r => r.id === opp.region);
+                  const stepLabel = FG.LEAD_STEPS.find(s => s.id === l.currentStep)?.label;
+                  return (
+                    <div key={l.id} className="cs-lead">
+                      <div className="cs-lead__row">
+                        <p className="cs-lead__name">
+                          <span className="cs-lead__brand-dot" style={{ background: b.tokens.primary }}></span>
+                          {l.candidate.name}
+                        </p>
+                        <span className={'cs-lead__priority cs-lead__priority--' + l.priority}>{l.priority.toUpperCase()}</span>
+                      </div>
+                      <p className="cs-lead__opp">{opp.name} · {opp.city}</p>
+                      <div className="cs-lead__pills">
+                        <span className="cs-lead__pill">{region?.label}</span>
+                        <span className="cs-lead__pill">{l.candidate.capital}</span>
+                        <span className="cs-lead__pill">{stepLabel}</span>
+                      </div>
+                      <p className="cs-lead__meta">
+                        Assigned · {l.assignedTo.name} — updated {l.lastUpdate}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </>);
+  }
+
+  function NewBrandsView() {
+    const STATUS = { 'to-analyse': 'À analyser', 'in-discussion': 'En discussion', 'recommended': 'Recommandé', 'validated': 'Validé', 'rejected': 'Refusé', 'on-hold': 'En attente' };
+    const conceptLabel = (id) => FG.CONCEPT_TYPES.find(c => c.id === id)?.label || id;
+    return (<>
+      <header className="cs-head">
+        <p className="cs-head__eyebrow" style={{ color: '#9c2a1f' }}>New Brand Concepts</p>
+        <h1 className="cs-head__title">Idées de marque & projets de franchise</h1>
+        <p style={{ fontSize: 13, color: 'rgba(14,27,40,0.65)', margin: '6px 0 0' }}>
+          {FG.NEW_BRAND_LEADS.length} concept{FG.NEW_BRAND_LEADS.length > 1 ? 's' : ''} reçu{FG.NEW_BRAND_LEADS.length > 1 ? 's' : ''} via le CTA "Make Your Own Brand" — à analyser par l'équipe développement.
+        </p>
+      </header>
+
+      <div className="nb-grid">
+        {FG.NEW_BRAND_LEADS.map(l => (
+          <article key={l.id} className="nb-card">
+            <header className="nb-card__head">
+              <span className="nb-card__badge">★ NEW BRAND</span>
+              <span className="nb-card__status">{STATUS[l.status] || l.status}</span>
+            </header>
+            <p className="nb-card__type">{conceptLabel(l.conceptType)}</p>
+            <h3 className="nb-card__name">{l.projectName}</h3>
+            <p className="nb-card__desc">{l.description}</p>
+            <div className="nb-card__rows">
+              <div><span>Localisation</span><strong>{l.location || '—'}</strong></div>
+              <div><span>Budget estimé</span><strong>{l.budget ? FG.fmtEur(l.budget) : '—'}</strong></div>
+              <div><span>Candidat</span><strong>{l.candidate.name}</strong></div>
+              <div><span>Contact</span><strong>{l.candidate.email}</strong></div>
+              <div><span>Assigné à</span><strong>{l.assignedTo}</strong></div>
+              <div><span>Reçu</span><strong>{l.createdAt}</strong></div>
+            </div>
+            {l.inspirations && <p className="nb-card__insp"><em>Inspirations :</em> {l.inspirations}</p>}
+            {l.attachments && l.attachments.length > 0 && (
+              <div className="nb-card__att">
+                {l.attachments.map((a, i) => <span key={i} className="nb-card__att-pill">📎 {a}</span>)}
+              </div>
+            )}
+            <div className="nb-card__actions">
+              <button className="lp-btn lp-btn--ghost lp-btn--sm">Voir le détail</button>
+              <button className="lp-btn lp-btn--primary lp-btn--sm">Assigner / répondre</button>
+            </div>
+          </article>
+        ))}
+        {FG.NEW_BRAND_LEADS.length === 0 && (
+          <div style={{ padding: 60, textAlign: 'center', border: '0.5px dashed rgba(14,27,40,0.15)', borderRadius: 8, color: 'rgba(14,27,40,0.55)', fontSize: 13 }}>
+            Aucun nouveau concept reçu pour le moment.
+          </div>
+        )}
+      </div>
+    </>);
+  }
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

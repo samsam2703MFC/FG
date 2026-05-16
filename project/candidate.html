@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Franchise Generation — My candidate space</title>
+<link rel="stylesheet" href="fg.css" />
+</head>
+<body class="fg-mode">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="fg-data.js"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useMemo } = React;
+const FG = window.FG_DATA;
+
+function App() {
+  // Pick lead from ?lead=… or fall back to the first one in the mock
+  const params = new URLSearchParams(window.location.search);
+  const leadParam = params.get('lead');
+  // Show all leads owned by the candidate; for demo: lead-001 is "the candidate"
+  const lead = FG.CANDIDATE_LEADS.find(l => l.id === leadParam) || FG.CANDIDATE_LEADS[0];
+  const opp = FG.ONBOARDING_OPPORTUNITIES.find(o => o.id === lead.opportunity);
+  const brand = FG.brandById(opp.brand);
+  const region = FG.REGIONS.find(r => r.id === opp.region);
+  const stepIdx = FG.LEAD_STEPS.findIndex(s => s.id === lead.currentStep);
+
+  return (
+    <div className="cl">
+      <header className="cl-top">
+        <img src="img/fg-logo.png" alt="Franchise Generation" className="cl-top__logo" />
+        <div className="cl-top__nav">
+          <a href="ecosystem.html" style={{ color: 'rgba(14,27,40,0.65)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M10 11L7 7M14 11l3-4M10 13l-3 4M14 13l3 4"/></svg>
+            Écosystème
+          </a>
+          <a href="landing.html" style={{ color: 'rgba(14,27,40,0.65)' }}>← Back to landing</a>
+          <div className="cl-top__user">
+            <span className="cl-top__avatar">{lead.candidate.name.split(' ').map(s => s[0]).join('')}</span>
+            <span>{lead.candidate.name}</span>
+          </div>
+        </div>
+      </header>
+
+      <main className="cl-main">
+        <div className="cl-head">
+          <div>
+            <p className="cl-head__eyebrow">My candidate space</p>
+            <h1 className="cl-head__title">Your application is in progress</h1>
+            <p className="cl-head__sub">Track your lead, exchange with your consultant and upload the documents required to move forward.</p>
+          </div>
+          <div className="cl-head__opp">
+            <p className="cl-head__eyebrow" style={{ color: brand.tokens.primary }}>● {brand.name}</p>
+            <p style={{ fontSize: 18, fontWeight: 600, margin: '4px 0' }}>{opp.name}</p>
+            <p style={{ fontSize: 12, color: 'rgba(14,27,40,0.55)', margin: 0 }}>
+              {opp.city} · {region?.label} · Opening {opp.opening}
+            </p>
+          </div>
+        </div>
+
+        <div className="cl-grid">
+          {/* Main column */}
+          <div>
+            {/* Pipeline */}
+            <div className="cl-card">
+              <p className="cl-card__title">Pipeline status</p>
+              <p className="cl-card__sub">Step {stepIdx + 1} of {FG.LEAD_STEPS.length} · last update {lead.lastUpdate}</p>
+              <div className="cl-pipeline">
+                {FG.LEAD_STEPS.map((s, i) => {
+                  const past = i < stepIdx;
+                  const current = i === stepIdx;
+                  const hist = lead.history.find(h => h.step === s.id);
+                  return (
+                    <div key={s.id} className={'cl-pipe-step ' + (past ? 'is-done' : current ? 'is-current' : 'is-pending')}>
+                      <span className="cl-pipe-dot"></span>
+                      <span className="cl-pipe-step__label">{s.label}</span>
+                      {hist && <span className="cl-pipe-step__date">{hist.at}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="cl-card">
+              <p className="cl-card__title">Conversation with your consultant</p>
+              <p className="cl-card__sub">{lead.assignedTo.name} · {lead.assignedTo.role}</p>
+              <div className="cl-msgs">
+                {lead.messages.map((m, i) => (
+                  <div key={i} className={'cl-msg cl-msg--' + m.from}>
+                    <div>
+                      <div className="cl-msg__bubble">{m.body}</div>
+                      <p className="cl-msg__time">{m.from === 'candidate' ? 'You' : m.name} · {m.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="cl-composer">
+                <textarea rows={1} placeholder="Write a message to your consultant…"></textarea>
+                <button className="lp-btn lp-btn--primary">Send</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Side rail */}
+          <aside>
+            <div className="cl-card">
+              <p className="cl-card__title">Next step</p>
+              <p style={{ fontSize: 13, margin: 0, color: 'var(--brand-ink)', fontWeight: 500 }}>{lead.nextAction}</p>
+            </div>
+
+            <div className="cl-card">
+              <p className="cl-card__title">Required documents</p>
+              <p className="cl-card__sub">Upload before the next appointment.</p>
+              {lead.requestedDocuments.map((d, i) => (
+                <div key={i} className="cl-doc-row">
+                  <span>{d}</span>
+                  <span className="cl-doc-row__pending">Pending →</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="cl-card">
+              <p className="cl-card__title">Appointments</p>
+              {lead.appointments.length === 0
+                ? <p style={{ fontSize: 12, color: 'rgba(14,27,40,0.55)', margin: 0 }}>No appointment scheduled yet.</p>
+                : lead.appointments.map((a, i) => (
+                  <div key={i} className="cl-doc-row">
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 500, margin: 0 }}>{a.kind}</p>
+                      <p style={{ fontSize: 11, color: 'rgba(14,27,40,0.55)', margin: '2px 0 0' }}>{a.when}</p>
+                    </div>
+                    <span className={a.status === 'done' ? 'cl-doc-row__done' : 'cl-doc-row__pending'}>
+                      {a.status === 'done' ? '✓ Done' : '○ Planned'}
+                    </span>
+                  </div>
+                ))}
+            </div>
+
+            <div className="cl-card">
+              <p className="cl-card__title">Your profile</p>
+              <div className="cl-side-row"><span className="cl-side-row__l">Email</span><span className="cl-side-row__v">{lead.candidate.email}</span></div>
+              <div className="cl-side-row"><span className="cl-side-row__l">Phone</span><span className="cl-side-row__v">{lead.candidate.phone}</span></div>
+              <div className="cl-side-row"><span className="cl-side-row__l">Region</span><span className="cl-side-row__v">{FG.REGIONS.find(r => r.id === lead.candidate.region)?.label}</span></div>
+              <div className="cl-side-row"><span className="cl-side-row__l">Capital</span><span className="cl-side-row__v">{lead.candidate.capital}</span></div>
+              <div className="cl-side-row"><span className="cl-side-row__l">Lead ref.</span><span className="cl-side-row__v" style={{ fontFamily: 'monospace', fontSize: 11 }}>{lead.id}</span></div>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+/* =========================================================
+   COUQ — Saint-Géry landing
+   Compose le design system Couq (colors_and_type.css).
+   Requiert : --couq-sarrasin, --couq-sarrasin-soft, --couq-brique,
+              --couq-noir, --couq-ocre, --couq-beton,
+              --font-display, --font-text, --font-mono,
+              --fw-regular, --border-soft
+   ========================================================= */
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--couq-sarrasin);
+  color: var(--couq-noir);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: clamp(20px, 3.5vw, 40px) clamp(32px, 6vw, 64px) clamp(32px, 6vw, 64px);
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: clamp(20px, 2.8vw, 32px);
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* --- Couq wordmark --- */
+.couq-mark {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+}
+
+/* --- Couques au beurre fourrées — tile colorée brique --- */
+.couques {
+  width: 100%;
+  background: var(--couq-brique);
+  color: var(--couq-sarrasin);
+  border-radius: 14px;
+  padding: clamp(20px, 3vw, 32px);
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: clamp(18px, 3vw, 32px);
+  align-items: center;
+  text-align: left;
+  box-shadow: 0 18px 40px -24px rgba(26, 22, 18, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+.couques::before {
+  content: "N° 01";
+  position: absolute;
+  top: clamp(12px, 1.5vw, 18px);
+  right: clamp(16px, 2vw, 24px);
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 0.85vw, 12px);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--couq-ocre);
+}
+.couques h2 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-regular);
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--couq-sarrasin);
+  margin: 0 0 clamp(10px, 1.4vw, 14px);
+}
+.couques h2 em { font-style: italic; color: var(--couq-ocre); }
+.couques p {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(14px, 1.2vw, 16px);
+  line-height: 1.45;
+  color: rgba(232, 220, 192, 0.92);
+  margin: 0;
+  max-width: 38ch;
+}
+.couques img {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+@media (max-width: 640px) {
+  .couques { grid-template-columns: 1fr; text-align: center; }
+  .couques p { margin-left: auto; margin-right: auto; }
+}
+
+/* --- Tile Saint-Géry — compact 2 cols --- */
+.tile {
+  width: 100%;
+  max-width: 520px;
+  background: var(--couq-sarrasin-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: clamp(22px, 3vw, 32px);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: clamp(18px, 3vw, 28px);
+  row-gap: clamp(16px, 2.5vw, 22px);
+  align-items: center;
+  text-align: left;
+  box-shadow: 0 1px 0 rgba(26, 22, 18, 0.04);
+}
+.tile-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tile-eyebrow {
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 0.9vw, 12px);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--couq-brique);
+}
+.tile .date {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: var(--fw-regular);
+  font-size: clamp(44px, 7vw, 84px);
+  line-height: 0.9;
+  color: var(--couq-noir);
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+.tile .date em {
+  font-style: italic;
+  color: var(--couq-brique);
+}
+.tile .gery {
+  height: clamp(96px, 11vw, 140px);
+  width: auto;
+  justify-self: end;
+}
+.tile .addr {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: clamp(16px, 2vw, 20px);
+  border-top: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: clamp(12px, 1vw, 14px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--couq-noir);
+  line-height: 1.6;
+  text-align: center;
+}
+.tile .addr-lab {
+  color: var(--couq-beton);
+  margin-right: 10px;
+}
+@media (max-width: 480px) {
+  .tile { grid-template-columns: 1fr; text-align: center; }
+  .tile-left { align-items: center; }
+  .tile .gery { justify-self: center; }
+}
+
+/* --- Mail XL en mono --- */
+.mail {
+  font-family: var(--font-mono);
+  font-size: clamp(22px, 3vw, 40px);
+  letter-spacing: 0.04em;
+  color: var(--couq-noir);
+  text-decoration: none;
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid var(--couq-brique);
+  transition: color 0.22s, border-color 0.22s, transform 0.22s;
+  line-height: 1;
+  display: inline-block;
+}
+.mail:hover {
+  color: var(--couq-brique);
+  border-bottom-color: var(--couq-noir);
+  transform: translateY(-2px);
+}
+
+/* --- Footer --- */
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: clamp(32px, 5vw, 56px);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--couq-beton);
+}
+.foot span:last-child { color: var(--couq-brique); }
+@media (max-width: 560px) {
+  .foot { flex-direction: column; gap: 8px; text-align: center; }
+}
