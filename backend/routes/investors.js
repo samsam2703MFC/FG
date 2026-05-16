@@ -45,10 +45,8 @@ router.use(authenticate);
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function canAccessInvestor(req, investorId) {
-  if (req.user.role === 'admin') return true;
-  if (req.user.role === 'investor' && req.user.investorId === investorId) return true;
-  return false;
+function canAccessInvestor(req) {
+  return ['admin', 'consultant'].includes(req.user.role);
 }
 
 function paginateArray(arr, page = 1, limit = 20) {
@@ -71,7 +69,7 @@ router.get('/', authorize('admin'), (req, res) => {
 // GET /api/investors/:id
 // ---------------------------------------------------------------------------
 router.get('/:id', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -86,7 +84,7 @@ router.get('/:id', (req, res, next) => {
 // GET /api/investors/:id/portfolio
 // ---------------------------------------------------------------------------
 router.get('/:id/portfolio', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -117,7 +115,7 @@ router.get('/:id/portfolio', (req, res, next) => {
 // GET /api/investors/:id/portfolio/:brandId
 // ---------------------------------------------------------------------------
 router.get('/:id/portfolio/:brandId', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -136,7 +134,7 @@ router.get('/:id/portfolio/:brandId', (req, res, next) => {
 // GET /api/investors/:id/documents
 // ---------------------------------------------------------------------------
 router.get('/:id/documents', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -160,7 +158,7 @@ router.get('/:id/documents', (req, res, next) => {
 // GET /api/investors/:id/repayments
 // ---------------------------------------------------------------------------
 router.get('/:id/repayments', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -204,7 +202,7 @@ router.post(
   ],
   (req, res, next) => {
     try {
-      if (!canAccessInvestor(req, req.params.id)) {
+      if (!canAccessInvestor(req)) {
         return next(createError(403, 'Access denied', 'FORBIDDEN'));
       }
 
@@ -256,7 +254,7 @@ router.put('/:id', (req, res, next) => {
   const investor = INVESTORS.find(i => i.id === req.params.id);
   if (!investor) return next(createError(404, `Investor '${req.params.id}' not found`, 'INVESTOR_NOT_FOUND'));
 
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -282,7 +280,7 @@ router.put('/:id', (req, res, next) => {
 // GET /api/investors/:id/opportunities
 // ---------------------------------------------------------------------------
 router.get('/:id/opportunities', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -316,7 +314,7 @@ router.get('/:id/opportunities', (req, res, next) => {
 // GET /api/investors/:id/contracts
 // ---------------------------------------------------------------------------
 router.get('/:id/contracts', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
@@ -356,7 +354,7 @@ router.get('/:id/contracts', (req, res, next) => {
 // GET /api/investors/:id/communications
 // ---------------------------------------------------------------------------
 router.get('/:id/communications', (req, res, next) => {
-  if (!canAccessInvestor(req, req.params.id)) {
+  if (!canAccessInvestor(req)) {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 

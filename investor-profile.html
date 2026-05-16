@@ -14,7 +14,7 @@
     window.location.replace('login.html?portal=admin');
     return;
   }
-  var allowed = ['admin', 'consultant', 'investor'];
+  var allowed = ['admin', 'consultant'];
   if (!allowed.includes(stored.user && stored.user.role)) {
     window.location.replace('backoffice.html');
     return;

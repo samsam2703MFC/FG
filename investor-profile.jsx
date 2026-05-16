@@ -1003,7 +1003,7 @@ function InvestorProfileApp() {
   const investorId  = params.get('investor') || 'inv-001';
   const initTab     = params.get('tab') || 'overview';
   const currentUser = window.FG_CURRENT_USER || {};
-  const isAdmin     = ['admin', 'consultant'].includes(currentUser.role);
+  const isAdmin = true; // page is admin/consultant only — all tabs visible
 
   const [tab,          setTabRaw]    = useState(initTab);
   const [investor,     setInvestor]  = useState(null);
