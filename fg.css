@@ -1278,6 +1278,27 @@ body.theme-mania .brand-shop-card__name { }
   cursor: pointer;
 }
 .lp-topbar__nav a:hover { color: var(--brand-ink); }
+.lp-topbar__staff {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px 7px 10px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(14, 27, 40, 0.15);
+  background: transparent;
+  color: rgba(14, 27, 40, 0.55) !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  text-decoration: none;
+  transition: border-color .15s, color .15s, background .15s;
+  white-space: nowrap;
+}
+.lp-topbar__staff svg { width: 15px; height: 15px; flex-shrink: 0; }
+.lp-topbar__staff:hover {
+  border-color: var(--brand-ink) !important;
+  color: var(--brand-ink) !important;
+  background: rgba(14, 27, 40, 0.04) !important;
+}
 
 /* ==========================================================================
    LOGIN PAGE

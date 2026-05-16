@@ -163,6 +163,14 @@ function FgLandingTopbar({ onLogin }) {
             </button>
           ))}
         </div>
+        <a href="login.html?portal=admin" className="lp-topbar__staff" title="Consultant & Admin sign in">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20a8 8 0 0 1 16 0"/>
+            <path d="M15 7l1.5 1.5L19 6"/>
+          </svg>
+          <span>Staff</span>
+        </a>
       </nav>
     </header>
   );
