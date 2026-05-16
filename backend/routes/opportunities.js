@@ -9,6 +9,7 @@
  * POST /api/opportunities/:id/interest            — express interest (creates a lead)
  * GET  /api/opportunities/:id/candidates          — list associated candidate leads
  * GET  /api/opportunities/:id/interests           — list investor interests for an opportunity
+ * POST /api/opportunities/:id/validate            — validate candidate & close opportunity (admin, consultant)
  *
  * Query params for GET /:
  *   brand    — filter by brand id (e.g. ?brand=atelier)
@@ -22,6 +23,8 @@
  *   GET /api/opportunities?brand=atelier&type=onboarding
  *   POST /api/opportunities/op-bxl-cookies/interest
  *   Body: { "amount": 5000, "message": "Interested in this opportunity" }
+ *   POST /api/opportunities/op-bxl-cookies/validate
+ *   Body: { "candidateId": "lead-001" }
  */
 
 const express = require('express');
@@ -35,9 +38,13 @@ const {
   INVESTOR_INTERESTS,
   OPP_VALIDATION_STATUSES,
   BRANDS,
-  REGIONS
+  REGIONS,
+  ONBOARDING_RECORDS,
+  CRM_TASKS,
+  AUDIT_LOG
 } = require('../data/seed');
 const { createError } = require('../middleware/errorHandler');
+const { validateOpportunity } = require('../services/validateOpportunity');
 
 const router = express.Router();
 
@@ -200,5 +207,41 @@ router.get('/:id/interests', authenticate, authorize('admin', 'consultant'), (re
     meta: { total: interests.length, opportunityId: req.params.id }
   });
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/opportunities/:id/validate
+// ---------------------------------------------------------------------------
+router.post(
+  '/:id/validate',
+  authenticate,
+  authorize('admin', 'consultant'),
+  (req, res, next) => {
+    try {
+      const { candidateId } = req.body;
+      if (!candidateId || typeof candidateId !== 'string') {
+        return res.status(422).json({
+          error: 'candidateId is required and must be a string',
+          code: 'VALIDATION_ERROR'
+        });
+      }
+
+      const result = validateOpportunity({
+        oppId: req.params.id,
+        candidateId,
+        validatedBy: req.user.email,
+        collections: { ONBOARDING_OPPORTUNITIES, CANDIDATE_LEADS, ONBOARDING_RECORDS, CRM_TASKS, AUDIT_LOG }
+      });
+
+      res.status(200).json({
+        data: result,
+        message: 'Opportunity closed. Onboarding started.'
+      });
+    } catch (err) {
+      if (err.code === 'ALREADY_CLOSED') return next(createError(409, err.message, err.code));
+      if (err.code === 'NOT_FOUND' || err.code === 'CANDIDATE_NOT_FOUND') return next(createError(404, err.message, err.code));
+      next(err);
+    }
+  }
+);
 
 module.exports = router;

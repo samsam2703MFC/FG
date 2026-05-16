@@ -1551,6 +1551,10 @@ const INVESTOR_PREFERENCES = [
   }
 ];
 
+const ONBOARDING_RECORDS = [];
+const CRM_TASKS = [];
+const AUDIT_LOG = [];
+
 module.exports = {
   BRANDS,
   REGIONS,
@@ -1583,6 +1587,9 @@ module.exports = {
   BENCHMARKS,
   SHARE_CLASSES,
   BRANDS_FULL,
+  ONBOARDING_RECORDS,
+  CRM_TASKS,
+  AUDIT_LOG,
 };
 
 // Script entry: print a summary when run directly

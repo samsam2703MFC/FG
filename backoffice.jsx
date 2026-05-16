@@ -700,13 +700,237 @@ function BoShops({ ctx }) {
 // ====================================================================
 // OPPORTUNITIES
 // ====================================================================
+// ====================================================================
+// OPPORTUNITIES — table + candidates panel + validate flow
+// ====================================================================
+const STEP_LABELS = {
+  'interested':            'Intérêt exprimé',
+  'consultant-review':     'En revue consultant',
+  'first-contact-planned': '1er contact planifié',
+  'first-contact-done':    '1er contact effectué',
+  'financing-precheck':    'Pré-check financement',
+  'location-validation':   'Validation local',
+  'business-plan':         'Business plan',
+  'committee':             'Comité de validation',
+  'contract-prep':         'Préparation contrat',
+  'training-planning':     'Formation',
+  'opening-planning':      'Planification ouverture',
+};
+
+const STEP_WEIGHT = Object.fromEntries(Object.keys(STEP_LABELS).map((k, i) => [k, i]));
+
+function stepTone(step) {
+  const w = STEP_WEIGHT[step] ?? 0;
+  if (w >= 7) return 'success';
+  if (w >= 4) return 'info';
+  return 'neutral';
+}
+
+function addBusinessDays(days) {
+  const d = new Date();
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+  }
+  return d.toLocaleDateString('fr-BE', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// Candidates side panel
+function CandidatesPanel({ opp, candidates, readOnly, onClose, onValidate }) {
+  const [confirming, setConfirming] = React.useState(null); // candidate to confirm
+
+  return (
+    <>
+      <div className="bo-panel-backdrop" onClick={onClose} />
+      <aside className="bo-panel">
+        <header className="bo-panel__head">
+          <div>
+            <p className="bo-panel__eyebrow">Candidates</p>
+            <h2 className="bo-panel__title">{opp.name}</h2>
+            <p className="bo-panel__sub">{candidates.length} candidate{candidates.length !== 1 ? 's' : ''}
+              {readOnly && <> · <span className="bo-panel__closed-tag">Closed — Won</span></>}
+            </p>
+          </div>
+          <button className="bo-panel__close" onClick={onClose}>✕</button>
+        </header>
+
+        <div className="bo-panel__body">
+          {!candidates.length && (
+            <div className="bo-panel__empty">No candidates for this opportunity yet.</div>
+          )}
+          {candidates.map(lead => (
+            <div key={lead.id} className={`bo-candidate-card${lead.priority === 'high' ? ' bo-candidate-card--high' : ''}`}>
+              <div className="bo-candidate-card__top">
+                <div className="bo-candidate-card__avatar">
+                  {lead.candidate.name[0]}
+                </div>
+                <div className="bo-candidate-card__info">
+                  <p className="bo-candidate-card__name">{lead.candidate.name}</p>
+                  <p className="bo-candidate-card__contact">
+                    {lead.candidate.email} · {lead.candidate.phone}
+                  </p>
+                  <p className="bo-candidate-card__meta">
+                    <span>Source: {lead.source}</span>
+                    <span> · Budget: {lead.candidate.capital}</span>
+                  </p>
+                </div>
+                {!readOnly && (
+                  <button className="bo-btn bo-btn--primary bo-btn--sm"
+                    onClick={() => setConfirming(lead)}>
+                    ✓ Valider
+                  </button>
+                )}
+                {readOnly && lead.id === opp.validatedCandidateId && (
+                  <span className="bo-validated-badge">✓ Validé</span>
+                )}
+              </div>
+
+              <div className="bo-candidate-card__pipeline">
+                <BoStatus tone={stepTone(lead.currentStep)}>
+                  {STEP_LABELS[lead.currentStep] || lead.currentStep}
+                </BoStatus>
+                <span className="bo-candidate-card__last">
+                  Dernière activité: {lead.lastUpdate}
+                </span>
+              </div>
+
+              {lead.notes && (
+                <p className="bo-candidate-card__notes">{lead.notes}</p>
+              )}
+
+              <div className="bo-candidate-card__foot">
+                <span>Consultant: {lead.assignedTo?.name}</span>
+                <span>Créé: {lead.createdAt}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {confirming && (
+        <ValidateConfirmModal
+          candidate={confirming}
+          opp={opp}
+          losersCount={candidates.length - 1}
+          onClose={() => setConfirming(null)}
+          onConfirm={() => { onValidate(confirming); setConfirming(null); }}
+        />
+      )}
+    </>
+  );
+}
+
+// Validate confirmation modal
+function ValidateConfirmModal({ candidate, opp, losersCount, onClose, onConfirm }) {
+  const [busy, setBusy] = React.useState(false);
+  const confirm = () => { setBusy(true); setTimeout(() => { onConfirm(); setBusy(false); }, 600); };
+
+  return (
+    <div className="bo-modal-overlay" style={{ zIndex: 600 }}>
+      <div className="bo-modal bo-modal--confirm">
+        <header className="bo-modal__head">
+          <p className="bo-modal__eyebrow">Confirmer la validation</p>
+          <h2 className="bo-modal__title">Valider {candidate.candidate.name} ?</h2>
+        </header>
+        <div className="bo-modal__body" style={{ padding: '0 24px 8px' }}>
+          <div className="bo-confirm-effect">
+            <div className="bo-confirm-effect__item bo-confirm-effect__item--win">
+              <span className="bo-confirm-effect__icon">🏆</span>
+              <div>
+                <strong>{candidate.candidate.name}</strong>
+                <p>Dossier onboarding créé · étape initiale: <em>Préparation contrat</em></p>
+              </div>
+            </div>
+            {losersCount > 0 && (
+              <div className="bo-confirm-effect__item">
+                <span className="bo-confirm-effect__icon">📋</span>
+                <div>
+                  <strong>{losersCount} autre{losersCount > 1 ? 's' : ''} candidat{losersCount > 1 ? 's' : ''}</strong>
+                  <p>Tâche CRM créée · type: <em>Rappel — opportunité clôturée</em> · échéance: {addBusinessDays(3)}</p>
+                </div>
+              </div>
+            )}
+            <div className="bo-confirm-effect__item">
+              <span className="bo-confirm-effect__icon">🔒</span>
+              <div>
+                <strong>Opportunité {opp.name}</strong>
+                <p>Statut → <em>Closed — Won</em> · journal d'audit enregistré</p>
+              </div>
+            </div>
+          </div>
+          <p className="bo-confirm-warn">Cette action est irréversible.</p>
+        </div>
+        <footer className="bo-modal__actions">
+          <button className="bo-btn bo-btn--ghost" onClick={onClose} disabled={busy}>Annuler</button>
+          <button className="bo-btn bo-btn--primary" onClick={confirm} disabled={busy}>
+            {busy ? 'Validation…' : 'Confirmer la validation'}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 function BoOpportunities({ ctx }) {
   const { FG } = ctx;
+  const currentUser = window.FG_CURRENT_USER || {};
+  const [closedFilter, setClosedFilter] = React.useState(false);
+  const [panelOppId,   setPanelOppId]   = React.useState(null);
+  // local closed set — tracks opps closed in this session
+  const [closedMap, setClosedMap] = React.useState({});
+
+  const getCandidates = (oppId) =>
+    FG.CANDIDATE_LEADS.filter(l => l.opportunity === oppId);
+
+  const allOpps = FG.ONBOARDING_OPPORTUNITIES;
+  const shownOpps = allOpps.filter(r => {
+    const isClosed = r.status === 'closed-won' || !!closedMap[r.id];
+    return closedFilter ? isClosed : !isClosed;
+  });
+
+  const panelOpp = panelOppId ? (allOpps.find(o => o.id === panelOppId) || null) : null;
+  const panelCandidates = panelOppId ? getCandidates(panelOppId) : [];
+  const panelReadOnly = panelOpp && (panelOpp.status === 'closed-won' || !!closedMap[panelOpp?.id]);
+
+  const handleValidate = async (lead) => {
+    const oppId = panelOppId;
+    // Call API — fall back to local state if API unavailable
+    try {
+      const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
+      await fetch(`/api/opportunities/${oppId}/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ candidateId: lead.id }),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch (_) { /* demo: continue regardless */ }
+
+    setClosedMap(m => ({
+      ...m,
+      [oppId]: { validatedCandidateId: lead.id, validatedBy: currentUser.email, validatedAt: new Date().toISOString() }
+    }));
+    // Update the opp object for read-only panel display
+    const opp = allOpps.find(o => o.id === oppId);
+    if (opp) { opp.status = 'closed-won'; opp.validatedCandidateId = lead.id; }
+    toast('success', `✓ ${lead.candidate.name} validé(e) · Onboarding démarré`);
+    setPanelOppId(null);
+  };
+
   return (
     <>
       <BoHead eyebrow="Network · Opportunities" title="Opportunity management"
         sub="Levées, ouvertures, nouveaux concepts, reprises et projets immobiliers."
-        actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-opportunity')}><BoIcon.plus />New opportunity</button>)}
+        actions={(
+          <>
+            <button className="bo-btn bo-btn--ghost" onClick={() => openModal('new-opportunity')}>Closed ({Object.keys(closedMap).length + allOpps.filter(o => o.status === 'closed-won').length})</button>
+            <div className="bo-filter-toggle">
+              <button className={`bo-filter-toggle__btn${!closedFilter ? ' is-active' : ''}`} onClick={() => setClosedFilter(false)}>Active</button>
+              <button className={`bo-filter-toggle__btn${closedFilter ? ' is-active' : ''}`} onClick={() => setClosedFilter(true)}>Closed</button>
+            </div>
+            <button className="bo-btn bo-btn--primary" onClick={() => openModal('new-opportunity')}><BoIcon.plus />New opportunity</button>
+          </>
+        )}
       />
       <BoFilters filters={[
         { label: 'Search', kind: 'search', placeholder: 'Project or city…' },
@@ -718,37 +942,57 @@ function BoOpportunities({ ctx }) {
         columns={[
           { k: 'name', l: 'Project', render: (r) => {
             const b = FG.brandById(r.brand);
+            const isClosed = r.status === 'closed-won' || !!closedMap[r.id];
             return (
-              <span className="bo-cell-brand">
+              <span className="bo-cell-brand" style={{ opacity: isClosed ? 0.6 : 1 }}>
                 <span className="bo-cell-brand__mark" style={{ background: b.tokens.primary }}>{b.logoMark}</span>
-                <span><p className="bo-cell-brand__name">{r.name}</p><p className="bo-cell-brand__kind">{b.name}</p></span>
+                <span>
+                  <p className="bo-cell-brand__name">{r.name}</p>
+                  <p className="bo-cell-brand__kind">{b.name} · {r.city}</p>
+                </span>
               </span>
             );
           }},
-          { k: 'city',   l: 'City' },
-          { k: 'format', l: 'Format' },
-          { k: 'opening',l: 'Opening' },
-          { k: 'budget', l: 'Required', align: 'right', render: (r) => FG.fmtEur(r.requiredInvest) },
+          { k: 'format',  l: 'Format' },
+          { k: 'opening', l: 'Opening' },
+          { k: 'budget',  l: 'Required', align: 'right', render: (r) => FG.fmtEur(r.requiredInvest) },
           { k: 'candidates', l: 'Candidates', align: 'center', render: (r) => {
-            const count = FG.CANDIDATE_LEADS.filter(c =>
-              (c.opportunities || []).some(o => o.opportunityId === r.id)
-            ).length;
+            const count = getCandidates(r.id).length;
+            const isClosed = r.status === 'closed-won' || !!closedMap[r.id];
+            if (isClosed) return <span className="bo-closed-won-badge">✓ Closed</span>;
             return count > 0
-              ? <span className="bo-count-badge">{count}</span>
+              ? <button className="bo-count-badge bo-count-badge--btn" onClick={() => setPanelOppId(r.id)}
+                  title="Click to review candidates">{count}</button>
               : <span style={{ color: 'rgba(14,27,40,.25)', fontSize: 12 }}>—</span>;
           }},
-          { k: 'status', l: 'Status',  render: (r) => <BoStatus tone="success">{r.status}</BoStatus> },
-          { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Open →</button> }
+          { k: 'status', l: 'Status', render: (r) => {
+            const isClosed = r.status === 'closed-won' || !!closedMap[r.id];
+            return <BoStatus tone={isClosed ? 'success' : 'info'}>{isClosed ? 'Closed — Won' : (r.status || 'Open')}</BoStatus>;
+          }},
+          { k: 'go', l: '', align: 'right', render: (r) => (
+            <button className="bo-btn bo-btn--ghost bo-btn--xs"
+              onClick={() => setPanelOppId(r.id)}>
+              {getCandidates(r.id).length > 0 ? 'Candidates →' : 'Open →'}
+            </button>
+          )}
         ]}
-        rows={FG.ONBOARDING_OPPORTUNITIES}
+        rows={shownOpps}
       />
+
+      {panelOpp && (
+        <CandidatesPanel
+          opp={{ ...panelOpp, ...(closedMap[panelOpp.id] || {}) }}
+          candidates={panelCandidates}
+          readOnly={panelReadOnly}
+          onClose={() => setPanelOppId(null)}
+          onValidate={handleValidate}
+        />
+      )}
     </>
   );
 }
 
-// ====================================================================
-// CRM & LEADS — kanban + sources
-// ====================================================================
+
 function BoCRM({ ctx }) {
   const { FG } = ctx;
   const sources = [
