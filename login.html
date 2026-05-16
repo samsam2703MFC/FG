@@ -65,16 +65,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // If already authenticated, skip login
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('fg_auth') || '{}');
-      if (stored.token && Date.now() < stored.expiresAt) {
-        const dest = (PORTAL_TARGETS[ROLE_PORTAL[stored.user?.role]] || PORTAL_TARGETS.investor).dest;
-        window.location.replace(dest);
-      }
-    } catch (_) {}
-  }, []);
+  const loginAs = (user) => {
+    storeAuth(user);
+    window.location.href = (PORTAL_TARGETS[ROLE_PORTAL[user.role]] || PORTAL_TARGETS.investor).dest;
+  };
 
   const handleEmail = async (e) => {
     e.preventDefault();
@@ -231,13 +225,7 @@ function App() {
                       key={u.id}
                       type="button"
                       className="lg__demo-tile"
-                      onClick={() => {
-                        setEmail(u.email);
-                        setPortal(u.portal);
-                        setPhase('email');
-                        setError('');
-                        window.scrollTo({top: 0, behavior: 'smooth'});
-                      }}
+                      onClick={() => loginAs(u)}
                     >
                       <span className="lg__demo-tile__avatar" style={{background: g.color}}>
                         {u.name[0]}
