@@ -729,6 +729,14 @@ function BoOpportunities({ ctx }) {
           { k: 'format', l: 'Format' },
           { k: 'opening',l: 'Opening' },
           { k: 'budget', l: 'Required', align: 'right', render: (r) => FG.fmtEur(r.requiredInvest) },
+          { k: 'candidates', l: 'Candidates', align: 'center', render: (r) => {
+            const count = FG.CANDIDATE_LEADS.filter(c =>
+              (c.opportunities || []).some(o => o.opportunityId === r.id)
+            ).length;
+            return count > 0
+              ? <span className="bo-count-badge">{count}</span>
+              : <span style={{ color: 'rgba(14,27,40,.25)', fontSize: 12 }}>—</span>;
+          }},
           { k: 'status', l: 'Status',  render: (r) => <BoStatus tone="success">{r.status}</BoStatus> },
           { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Open →</button> }
         ]}
