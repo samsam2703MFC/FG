@@ -1,50 +1,226 @@
 'use strict';
 
+require('dotenv').config();
+
 const express = require('express');
 const cors    = require('cors');
 const helmet  = require('helmet');
 const morgan  = require('morgan');
 const path    = require('path');
-const YAML    = require('yamljs');
-const swaggerUi = require('swagger-ui-express');
+const fs      = require('fs');
 
-require('dotenv').config();
+// ---- Swagger (optional — gracefully skipped if yaml file absent) ----
+let swaggerUi, swaggerDocument;
+try {
+  swaggerUi = require('swagger-ui-express');
+  const YAML = require('yamljs');
+  const swaggerPath = path.join(__dirname, 'swagger.yaml');
+  if (fs.existsSync(swaggerPath)) {
+    swaggerDocument = YAML.load(swaggerPath);
+  }
+} catch (_) {
+  // swagger-ui-express or yamljs not installed — /api-docs will be unavailable
+}
 
-const app = express();
+// ---- Routes ----
+const authRouter          = require('./routes/auth');
+const brandsRouter        = require('./routes/brands');
+const opportunitiesRouter = require('./routes/opportunities');
+const candidatesRouter    = require('./routes/candidates');
+const investorsRouter     = require('./routes/investors');
+const leadsRouter         = require('./routes/leads');
+const supportRouter       = require('./routes/support');
+const documentsRouter     = require('./routes/documents');
+const notificationsRouter = require('./routes/notifications');
+const regionsRouter       = require('./routes/regions');
+const landingRouter       = require('./routes/landing');
+const consultantsRouter   = require('./routes/consultants');
+const developersRouter    = require('./routes/developers');
+const backofficeRouter    = require('./routes/backoffice');
 
-// ── Middleware ────────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*',
-  credentials: true,
-}));
-app.use(express.json());
-app.use(morgan('combined'));
+// ---- Error handlers ----
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
-// ── Swagger docs ──────────────────────────────────────────────
-const swaggerDoc = YAML.load(path.join(__dirname, '..', 'docs', 'openapi.yaml'));
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
-
-// ── Routes ────────────────────────────────────────────────────
-app.use('/api/auth',         require('./routes/auth'));
-app.use('/api/brands',       require('./routes/brands'));
-app.use('/api/opportunities',require('./routes/opportunities'));
-app.use('/api/investors',    require('./routes/investors'));
-app.use('/api/candidates',   require('./routes/candidates'));
-
-// ── Health ────────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', ts: new Date().toISOString() });
-});
-
-// ── Error handler ─────────────────────────────────────────────
-app.use(require('./middleware/errorHandler'));
-
-// ── Start ─────────────────────────────────────────────────────
+// ============================================================================
+// App setup
+// ============================================================================
+const app  = express();
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`FG API listening on :${PORT}`);
-  console.log(`Docs → http://localhost:${PORT}/api/docs`);
+
+// ---- Security headers ----
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false
+}));
+
+// ---- CORS ----
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+  : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'];
+
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (corsOrigins.includes(origin) || corsOrigins.includes('*')) return cb(null, true);
+    cb(new Error(`CORS: origin '${origin}' not allowed`));
+  },
+  credentials: true,
+  methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// ---- Request logging ----
+const logFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
+app.use(morgan(logFormat));
+
+// ---- Body parsers ----
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ---- Static uploads ----
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+app.use('/uploads', express.static(UPLOAD_DIR));
+
+// ---- Health check ----
+app.get('/health', (req, res) => {
+  res.json({
+    status:  'ok',
+    service: 'franchise-generation-api',
+    env:     process.env.NODE_ENV || 'development',
+    uptime:  Math.round(process.uptime()),
+    ts:      new Date().toISOString()
+  });
 });
+
+// ---- Swagger UI ----
+if (swaggerUi && swaggerDocument) {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    customSiteTitle: 'Franchise Generation API',
+    swaggerOptions:  { persistAuthorization: true }
+  }));
+}
+
+// ---- API index ----
+app.get('/api', (req, res) => {
+  res.json({
+    name:    'Franchise Generation API',
+    version: '1.0.0',
+    docs:    '/api-docs',
+    health:  '/health',
+    routes: [
+      'POST   /api/auth/login',
+      'GET    /api/auth/me',
+      'PUT    /api/auth/me',
+      'GET    /api/brands',
+      'GET    /api/brands/:id',
+      'GET    /api/brands/:id/presentation',
+      'GET    /api/brands/:id/shops',
+      'GET    /api/brands/:id/opportunities',
+      'GET    /api/brands/:id/team',
+      'GET    /api/brands/:id/documents',
+      'GET    /api/opportunities',
+      'GET    /api/opportunities/:id',
+      'POST   /api/opportunities/:id/interest',
+      'GET    /api/opportunities/:id/candidates',
+      'GET    /api/candidates',
+      'POST   /api/candidates',
+      'GET    /api/candidates/:id',
+      'PUT    /api/candidates/:id',
+      'GET    /api/candidates/:id/leads',
+      'GET    /api/investors',
+      'GET    /api/investors/:id',
+      'GET    /api/investors/:id/portfolio',
+      'GET    /api/investors/:id/documents',
+      'GET    /api/investors/:id/repayments',
+      'POST   /api/investors/:id/interest',
+      'GET    /api/leads',
+      'GET    /api/leads/steps',
+      'GET    /api/leads/:id',
+      'PUT    /api/leads/:id',
+      'DELETE /api/leads/:id',
+      'GET    /api/support/tickets',
+      'POST   /api/support/tickets',
+      'GET    /api/support/tickets/:id',
+      'PUT    /api/support/tickets/:id',
+      'GET    /api/support/tickets/:id/messages',
+      'POST   /api/support/tickets/:id/messages',
+      'GET    /api/support/categories',
+      'GET    /api/support/priorities',
+      'GET    /api/documents',
+      'POST   /api/documents',
+      'GET    /api/documents/:id',
+      'PUT    /api/documents/:id',
+      'DELETE /api/documents/:id',
+      'GET    /api/documents/types',
+      'GET    /api/notifications',
+      'PUT    /api/notifications/read-all',
+      'PUT    /api/notifications/:id/read',
+      'DELETE /api/notifications/:id',
+      'GET    /api/regions',
+      'GET    /api/regions/:id',
+      'GET    /api/landing',
+      'GET    /api/landing/opportunities',
+      'GET    /api/consultants',
+      'GET    /api/consultants/:id',
+      'GET    /api/consultants/:id/leads',
+      'GET    /api/consultants/:id/schedule',
+      'GET    /api/developers',
+      'POST   /api/developers',
+      'GET    /api/developers/:id',
+      'PUT    /api/developers/:id',
+      'GET    /api/backoffice/dashboard',
+      'GET    /api/backoffice/stats'
+    ]
+  });
+});
+
+// ============================================================================
+// Route mounts
+// ============================================================================
+app.use('/api/auth',          authRouter);
+app.use('/api/brands',        brandsRouter);
+app.use('/api/opportunities', opportunitiesRouter);
+app.use('/api/candidates',    candidatesRouter);
+app.use('/api/investors',     investorsRouter);
+app.use('/api/leads',         leadsRouter);
+app.use('/api/support',       supportRouter);
+app.use('/api/documents',     documentsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/regions',       regionsRouter);
+app.use('/api/landing',       landingRouter);
+app.use('/api/consultants',   consultantsRouter);
+app.use('/api/developers',    developersRouter);
+app.use('/api/backoffice',    backofficeRouter);
+
+// ============================================================================
+// 404 + error handler (must be last)
+// ============================================================================
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// ============================================================================
+// Start server
+// ============================================================================
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log('\nFranchise Generation API');
+    console.log('========================');
+    console.log(`Environment : ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Server      : http://localhost:${PORT}`);
+    console.log(`API info    : http://localhost:${PORT}/api`);
+    console.log(`Health      : http://localhost:${PORT}/health`);
+    if (swaggerDocument) {
+      console.log(`Swagger     : http://localhost:${PORT}/api-docs`);
+    }
+    console.log('\nDemo credentials (password: "password"):');
+    console.log('  investor   → claire.vermeulen@example.com');
+    console.log('  admin      → admin@fg.be');
+    console.log('  consultant → sophie.renard@fg.be');
+    console.log('');
+  });
+}
 
 module.exports = app;
