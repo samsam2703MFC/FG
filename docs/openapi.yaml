@@ -1,0 +1,3386 @@
+openapi: 3.0.3
+info:
+  title: Franchise Generation API
+  description: |
+    REST API for the Franchise Generation platform — a multi-brand franchise ecosystem
+    connecting brands, candidates, investors, consultants, and real estate developers.
+
+    ## Authentication
+    All protected endpoints require a JWT Bearer token obtained from `POST /auth/login`.
+    Include the token in the `Authorization` header:
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ## Base URL
+    Production: `https://api.franchisegeneration.be/api/v1`
+    Local dev: `http://localhost:3000/api/v1`
+
+    ## Roles
+    | Role | Description |
+    |------|-------------|
+    | `admin` | Full backoffice access |
+    | `investor` | Investment portal access |
+    | `candidate` | Candidate onboarding portal |
+    | `consultant` | Lead management access |
+    | `developer` | Real estate developer access |
+    | `brand` | Brand management portal |
+
+  version: 1.0.0
+  contact:
+    name: Franchise Generation
+    url: https://franchisegeneration.be
+
+servers:
+  - url: /api/v1
+    description: Current version
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Auth
+    description: Authentication and user profile
+  - name: Brands
+    description: Brand catalog and brand-specific resources
+  - name: Opportunities
+    description: Investment and franchise opportunities
+  - name: Candidates
+    description: Franchise candidate management
+  - name: Investors
+    description: Investor profiles and portfolios
+  - name: Leads
+    description: Candidate lead pipeline (consultant-facing)
+  - name: Consultants
+    description: Consultant directory and lead assignment
+  - name: Developers
+    description: Real estate developer profiles
+  - name: Support
+    description: Helpdesk ticketing system
+  - name: Documents
+    description: Document vault (contracts, KYC, schedules)
+  - name: Notifications
+    description: User notification feed
+  - name: Regions
+    description: Geographic region reference data
+  - name: Landing
+    description: CMS-managed public landing page content
+  - name: Backoffice
+    description: Admin dashboard and statistics
+
+# ---------------------------------------------------------------------------
+# PATHS
+# ---------------------------------------------------------------------------
+paths:
+
+  # =========================================================================
+  # AUTH
+  # =========================================================================
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticate with email/password and receive a JWT access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: claire.vermeulen@example.com
+                password:
+                  type: string
+                  format: password
+                  example: "MySecurePassword123!"
+                portal:
+                  type: string
+                  enum: [investor, candidate, brand, developer, admin]
+                  description: Portal context hint (used to redirect after login)
+                  example: investor
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWTResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpbnZfMDAxIn0.abc123
+                expiresIn: 86400
+                user:
+                  id: inv_001
+                  email: claire.vermeulen@example.com
+                  role: investor
+                  name: Claire Vermeulen
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_CREDENTIALS
+                message: Email or password is incorrect.
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Invalidate the current JWT token (server-side blocklist).
+      responses:
+        '204':
+          description: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      description: Returns the full profile of the authenticated user based on their role.
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Investor'
+                  - $ref: '#/components/schemas/Candidate'
+              example:
+                id: inv_001
+                name: Claire Vermeulen
+                initials: CV
+                email: claire.vermeulen@example.com
+                role: investor
+                tier: Privilège
+                phone: "+32 477 12 34 56"
+                address: "Avenue Louise 142 · 1050 Bruxelles"
+                nationality: Belge
+                iban: BE68 5390 0754 7034
+                since: "Juin 2023"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags: [Auth]
+      summary: Update current user profile
+      description: Update editable fields on the authenticated user's profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                  example: "+32 477 12 34 56"
+                address:
+                  type: string
+                  example: "Avenue Louise 142 · 1050 Bruxelles"
+                iban:
+                  type: string
+                  example: BE68 5390 0754 7034
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Profile updated successfully.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /me/preferences:
+    get:
+      tags: [Auth]
+      summary: Get notification preferences
+      description: Returns all notification/communication preferences for the current user.
+      responses:
+        '200':
+          description: List of notification preferences
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: pay-email
+                    label:
+                      type: string
+                      example: "E-mail · versements reçus"
+                    channel:
+                      type: string
+                      enum: [email, sms, push]
+                      example: email
+                    enabled:
+                      type: boolean
+                      example: true
+              example:
+                - id: pay-email
+                  label: "E-mail · versements reçus"
+                  channel: email
+                  enabled: true
+                - id: crit-sms
+                  label: "SMS · alertes critiques uniquement"
+                  channel: sms
+                  enabled: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Auth]
+      summary: Update notification preferences
+      description: Bulk-update notification preference toggles.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required: [id, enabled]
+                properties:
+                  id:
+                    type: string
+                    example: pay-email
+                  enabled:
+                    type: boolean
+                    example: false
+            example:
+              - id: pay-email
+                enabled: false
+              - id: crit-sms
+                enabled: true
+      responses:
+        '200':
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Preferences updated successfully.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # =========================================================================
+  # BRANDS
+  # =========================================================================
+  /brands:
+    get:
+      tags: [Brands]
+      summary: List all brands
+      description: Returns the full catalog of brands in the FG ecosystem.
+      security: []
+      responses:
+        '200':
+          description: Array of brands
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Brand'
+              example:
+                - id: atelier
+                  name: "L'Atelier By"
+                  tagline: "Boulangerie de quartier · Belgique"
+                  kind: "Boulangerie · Pâtisserie"
+                  city: Bruxelles
+                  headquarters: "Bruxelles, BE"
+                  founded: 2022
+                  established: "5 magasins"
+                  logoSrc: img/logo.png
+                  logoMark: A
+                  theme: atelier
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /brands/{id}:
+    get:
+      tags: [Brands]
+      summary: Get brand by ID
+      description: Returns full brand detail including tokens (design system) and copy.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/brandId'
+      responses:
+        '200':
+          description: Brand detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Brand'
+                  - type: object
+                    properties:
+                      tokens:
+                        $ref: '#/components/schemas/BrandTokens'
+                      kpiLabels:
+                        type: object
+                        properties:
+                          ca:
+                            type: string
+                          profit:
+                            type: string
+                          cust:
+                            type: string
+                          basket:
+                            type: string
+                      copy:
+                        type: object
+                        properties:
+                          ecoNoun:
+                            type: string
+                          ecoNounPlural:
+                            type: string
+                          verdict:
+                            type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /brands/{id}/presentation:
+    get:
+      tags: [Brands]
+      summary: Get brand investor presentation
+      description: CMS-managed investor presentation data including hero, carousel, videos, concept, investment terms, team and documents.
+      parameters:
+        - $ref: '#/components/parameters/brandId'
+      responses:
+        '200':
+          description: Full brand presentation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandPresentation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /brands/{id}/shops:
+    get:
+      tags: [Brands]
+      summary: List brand shops
+      description: Returns all shops (franchise locations) belonging to a brand, with latest KPI snapshots.
+      parameters:
+        - $ref: '#/components/parameters/brandId'
+      responses:
+        '200':
+          description: Array of shops
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Shop'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /brands/{id}/opportunities:
+    get:
+      tags: [Brands]
+      summary: List brand opportunities
+      description: Returns investment/franchise opportunities belonging to a specific brand.
+      parameters:
+        - $ref: '#/components/parameters/brandId'
+      responses:
+        '200':
+          description: Array of opportunities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Opportunity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /brands/{id}/team:
+    get:
+      tags: [Brands]
+      summary: Get brand team
+      description: Returns the team roster for a brand (shown in investor presentation).
+      parameters:
+        - $ref: '#/components/parameters/brandId'
+      responses:
+        '200':
+          description: Array of team members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    role:
+                      type: string
+                      example: "Co-fondateur"
+                    personName:
+                      type: string
+                      example: Sam Verheyden
+                    description:
+                      type: string
+                      example: "Co-fondateur · stratégie & gouvernance"
+                    canContact:
+                      type: boolean
+                      example: true
+                    order:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /brands/{id}/documents:
+    get:
+      tags: [Brands]
+      summary: List brand documents
+      description: Returns downloadable brand documents (decks, franchise dossiers, legal) available to authenticated investors.
+      parameters:
+        - $ref: '#/components/parameters/brandId'
+      responses:
+        '200':
+          description: Array of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      example: "Brand deck"
+                    title:
+                      type: string
+                      example: "L'Atelier By — Deck investisseur 2026"
+                    size:
+                      type: string
+                      example: "4,2 MB"
+                    url:
+                      type: string
+                      format: uri
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # =========================================================================
+  # OPPORTUNITIES
+  # =========================================================================
+  /opportunities:
+    get:
+      tags: [Opportunities]
+      summary: List opportunities
+      description: Returns the marketplace of franchise/investment opportunities with optional filters.
+      security: []
+      parameters:
+        - name: brand
+          in: query
+          description: Filter by brand ID
+          schema:
+            type: string
+            example: atelier
+        - name: region
+          in: query
+          description: Filter by region code
+          schema:
+            type: string
+            example: bxl
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [open, closing, closed, pre-launch]
+            example: open
+        - name: type
+          in: query
+          description: Filter by opportunity type
+          schema:
+            type: string
+            enum: [franchise, investment, new-brand]
+            example: franchise
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Paginated list of opportunities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedList'
+              example:
+                data:
+                  - id: op-gent
+                    brand: atelier
+                    name: "L'Atelier Gand"
+                    city: Gent
+                    region: fla
+                    format: "Boutique 84 m²"
+                    openingDate: "Q3 2026"
+                    requiredInvest: 320000
+                    candidateContrib: 60000
+                    financingNeed: "Tax shelter + prêt investisseur"
+                    payback: "4,8 ans"
+                    status: "Closing imminent"
+                    type: franchise
+                total: 6
+                page: 1
+                limit: 20
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /opportunities/{id}:
+    get:
+      tags: [Opportunities]
+      summary: Get opportunity by ID
+      description: Returns full detail for a single opportunity.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Opportunity detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Opportunity'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /opportunities/{id}/interest:
+    post:
+      tags: [Opportunities]
+      summary: Express interest in an opportunity
+      description: Registers the authenticated user's interest in an opportunity, creating a lead or investment intent record.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Optional note from the investor/candidate
+                  example: "Je souhaite avoir plus d'informations sur le financement disponible."
+                budget:
+                  type: integer
+                  description: Intended investment amount in EUR
+                  example: 25000
+      responses:
+        '201':
+          description: Interest registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Your interest has been registered. A consultant will contact you shortly.
+                  leadId:
+                    type: string
+                    example: lead-042
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Interest already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # =========================================================================
+  # CANDIDATES
+  # =========================================================================
+  /candidates:
+    get:
+      tags: [Candidates]
+      summary: List candidates
+      description: Returns all candidate profiles. Accessible by admin and consultants.
+      parameters:
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [to-analyse, in-discussion, recommended, validated, rejected, on-hold]
+        - name: consultant
+          in: query
+          description: Filter by assigned consultant ID
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of candidates
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Candidate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Candidates]
+      summary: Create candidate profile
+      description: Creates a new candidate record (triggered during onboarding form submission).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateCreate'
+            example:
+              firstName: Marie
+              lastName: Lemoine
+              email: marie.lemoine@example.com
+              phone: "+32 478 11 22 33"
+              address: "Avenue Louise 142 · 1050 Bruxelles"
+              preferredRegion: bxl
+              language: "Français · Néerlandais (B2)"
+              experience: "Store Manager Decathlon 5 ans"
+              currentSituation: "En poste · disponible à 3 mois"
+              motivation: "Envie d'entreprendre dans un cadre structuré."
+              budget: 75000
+              financingCapacity: "Apport personnel + prêt BNP Fortis jusqu'à 150 000 €"
+              brandPreference: [cookies, couq]
+      responses:
+        '201':
+          description: Candidate created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /candidates/{id}:
+    get:
+      tags: [Candidates]
+      summary: Get candidate by ID
+      description: Returns the full candidate profile. Candidates can only access their own record.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Candidate detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Candidates]
+      summary: Update candidate profile
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateCreate'
+      responses:
+        '200':
+          description: Candidate updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /candidates/{id}/leads:
+    get:
+      tags: [Candidates]
+      summary: Get candidate's leads
+      description: Returns all opportunity leads linked to a candidate.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Array of candidate leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CandidateLead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Candidates]
+      summary: Add lead to candidate
+      description: Links a candidate to a new opportunity (creates a CandidateLead record).
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [opportunityId]
+              properties:
+                opportunityId:
+                  type: string
+                  example: op-bxl-cookies
+                consultantId:
+                  type: string
+                  description: Override auto-assignment
+      responses:
+        '201':
+          description: Lead created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidateLead'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /candidates/{id}/leads/{leadId}:
+    put:
+      tags: [Candidates]
+      summary: Update a candidate lead
+      description: Update validation status, fit score, or consultant notes on a specific candidate-opportunity link.
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                validationStatus:
+                  type: string
+                  enum: [to-analyse, in-discussion, recommended, validated, rejected, on-hold]
+                fitScore:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                consultantNotes:
+                  type: string
+      responses:
+        '200':
+          description: Lead updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidateLead'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /candidates/{id}/documents:
+    get:
+      tags: [Candidates]
+      summary: Get candidate documents
+      description: Returns documents submitted or requested for a candidate (CV, financial proofs, motivation letter, etc.).
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Array of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # =========================================================================
+  # INVESTORS
+  # =========================================================================
+  /investors:
+    get:
+      tags: [Investors]
+      summary: List investors
+      description: Returns all investor profiles. Accessible by admin only.
+      parameters:
+        - name: tier
+          in: query
+          schema:
+            type: string
+            enum: [Bronze, Argent, Or, Privilège]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of investors
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Investor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /investors/{id}:
+    get:
+      tags: [Investors]
+      summary: Get investor by ID
+      description: Returns the full investor profile. Investors can only access their own record.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Investor detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Investor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /investors/{id}/portfolio:
+    get:
+      tags: [Investors]
+      summary: Get investor portfolio
+      description: Returns all investments grouped by brand, including shop-level KPIs and performance charts.
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: brand
+          in: query
+          description: Filter to a specific brand
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Portfolio data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestorPortfolio'
+              example:
+                summary:
+                  totalInvested: 85000
+                  totalRepaid: 8580
+                  totalValuation: 91200
+                  roiTarget: 8.4
+                  roiCurrent: 8.0
+                brands:
+                  - brandId: atelier
+                    summary:
+                      invested: 45000
+                      repaid: 6200
+                      valuation: 49600
+                    shops:
+                      - id: couq-chatelain
+                        name: "Couq Châtelain"
+                        city: Bruxelles
+                        opened: "Juin 2024"
+                        invested: 25000
+                        repaid: 4100
+                        health: good
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /investors/{id}/documents:
+    get:
+      tags: [Investors]
+      summary: Get investor documents
+      description: Returns all documents in the investor's document vault.
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [investment, ownership, kyc, aml, banking, tax, contract, schedule, statement]
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [validated, pending, expired, missing, signed, review]
+      responses:
+        '200':
+          description: Array of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /investors/{id}/repayments:
+    get:
+      tags: [Investors]
+      summary: Get repayment schedule
+      description: Returns all repayment schedule rows across all investments for the investor.
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: paid
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Array of repayment records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    investmentId:
+                      type: integer
+                    shopName:
+                      type: string
+                    brandId:
+                      type: string
+                    dueDate:
+                      type: string
+                      format: date
+                    amount:
+                      type: number
+                    paid:
+                      type: boolean
+                    paidAt:
+                      type: string
+                      format: date-time
+                      nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /investors/{id}/interest:
+    post:
+      tags: [Investors]
+      summary: Express investment interest
+      description: Registers an investor's interest in a specific investment opportunity.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [opportunityId, amount]
+              properties:
+                opportunityId:
+                  type: string
+                  example: mania-namur
+                amount:
+                  type: integer
+                  description: Investment amount in EUR
+                  example: 10000
+                message:
+                  type: string
+                  example: "Je souhaite m'engager sur 10 000 € pour Mania Namur."
+      responses:
+        '201':
+          description: Interest registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  ticketId:
+                    type: string
+                    description: Support ticket created for follow-up
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # =========================================================================
+  # LEADS
+  # =========================================================================
+  /leads:
+    get:
+      tags: [Leads]
+      summary: List all leads
+      description: Returns the full pipeline of candidate leads. Primarily used by the consultant portal.
+      parameters:
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: consultant
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Current pipeline step
+          schema:
+            type: string
+            enum: [interested, consultant-review, first-contact-planned, first-contact-done,
+                   financing-precheck, location-validation, business-plan, committee,
+                   contract-prep, training-planning, opening-planning]
+        - name: type
+          in: query
+          description: Lead type
+          schema:
+            type: string
+            enum: [franchise, new-brand]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of leads
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Lead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /leads/{id}:
+    get:
+      tags: [Leads]
+      summary: Get lead by ID
+      description: Returns the full lead record including history, appointments, and messages.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Lead detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Leads]
+      summary: Update lead
+      description: Move a lead to a new pipeline step, update notes, or change priority.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentStep:
+                  type: string
+                  enum: [interested, consultant-review, first-contact-planned, first-contact-done,
+                         financing-precheck, location-validation, business-plan, committee,
+                         contract-prep, training-planning, opening-planning]
+                priority:
+                  type: string
+                  enum: [low, normal, high, urgent]
+                notes:
+                  type: string
+                nextAction:
+                  type: string
+      responses:
+        '200':
+          description: Lead updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Leads]
+      summary: Delete lead
+      description: Permanently removes a lead record. Requires admin role.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Lead deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # =========================================================================
+  # CONSULTANTS
+  # =========================================================================
+  /consultants:
+    get:
+      tags: [Consultants]
+      summary: List consultants
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Array of consultants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Consultant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /consultants/{id}:
+    get:
+      tags: [Consultants]
+      summary: Get consultant by ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Consultant detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consultant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /consultants/{id}/leads:
+    get:
+      tags: [Consultants]
+      summary: Get consultant's leads
+      description: Returns all leads assigned to a specific consultant.
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # =========================================================================
+  # DEVELOPERS
+  # =========================================================================
+  /developers:
+    get:
+      tags: [Developers]
+      summary: List real estate developers
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, pending]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of developers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Developer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Developers]
+      summary: Create developer profile
+      description: Register a new real estate developer (from the landing page CTA).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeveloperCreate'
+            example:
+              fullName: "Jean-Marc Dumont"
+              company: "Dumont Immobilier SA"
+              email: "jm.dumont@dumont-immo.be"
+              phone: "+32 2 345 67 89"
+              city: "Bruxelles"
+              surfaceM2: 120
+              rent: 3500
+              description: "Cellule commerciale disponible avenue Louise, rez-de-chaussée, vitrine 8m."
+      responses:
+        '201':
+          description: Developer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Developer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /developers/{id}:
+    get:
+      tags: [Developers]
+      summary: Get developer by ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Developer detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Developer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Developers]
+      summary: Update developer profile
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeveloperCreate'
+      responses:
+        '200':
+          description: Developer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Developer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # =========================================================================
+  # SUPPORT
+  # =========================================================================
+  /support/tickets:
+    get:
+      tags: [Support]
+      summary: List support tickets
+      description: Returns all support tickets for the authenticated user. Admins see all tickets.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, resolved, awaiting-investor, awaiting-admin]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [low, normal, high, urgent]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of tickets
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SupportTicket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Support]
+      summary: Create support ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [categoryId, subject]
+              properties:
+                categoryId:
+                  type: string
+                  enum: [investment, repayment, technical, document, legal, opportunity, general]
+                  example: repayment
+                priorityId:
+                  type: string
+                  enum: [low, normal, high, urgent]
+                  default: normal
+                subject:
+                  type: string
+                  example: "Question sur le remboursement de mai"
+                brandId:
+                  type: string
+                  nullable: true
+                  example: atelier
+                message:
+                  type: string
+                  description: Body of the first message in the thread
+                  example: "Bonjour, je n'ai pas reçu mon versement du 15 mai..."
+            example:
+              categoryId: repayment
+              priorityId: normal
+              subject: "Versement de mai non reçu"
+              brandId: atelier
+              message: "Bonjour, le versement prévu le 15 mai n'est pas arrivé sur mon compte."
+      responses:
+        '201':
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportTicket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /support/tickets/{id}:
+    get:
+      tags: [Support]
+      summary: Get ticket by ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportTicket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Support]
+      summary: Update ticket
+      description: Change ticket status or priority. Admins can reassign tickets.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [open, resolved, awaiting-investor, awaiting-admin]
+                priorityId:
+                  type: string
+                  enum: [low, normal, high, urgent]
+                assignedTo:
+                  type: string
+                  description: Name of admin/agent assigned (admin only)
+      responses:
+        '200':
+          description: Ticket updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportTicket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /support/tickets/{id}/messages:
+    get:
+      tags: [Support]
+      summary: Get ticket messages
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Array of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SupportMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Support]
+      summary: Post message to ticket
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  example: "Bonjour, j'ai déposé le document dans mon profil."
+                attachments:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Optional file attachments (max 10 MB each)
+      responses:
+        '201':
+          description: Message posted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /support/categories:
+    get:
+      tags: [Support]
+      summary: List support categories
+      security: []
+      responses:
+        '200':
+          description: Array of support categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: investment
+                    label:
+                      type: string
+                      example: "Question d'investissement"
+              example:
+                - id: investment
+                  label: "Question d'investissement"
+                - id: repayment
+                  label: "Question de remboursement"
+                - id: technical
+                  label: "Problème technique"
+                - id: document
+                  label: "Problème de document"
+                - id: legal
+                  label: "Juridique / conformité"
+
+  /support/priorities:
+    get:
+      tags: [Support]
+      summary: List support priorities
+      security: []
+      responses:
+        '200':
+          description: Array of priority levels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: normal
+                    label:
+                      type: string
+                      example: Normale
+              example:
+                - id: low
+                  label: Faible
+                - id: normal
+                  label: Normale
+                - id: high
+                  label: Élevée
+                - id: urgent
+                  label: Urgente
+
+  # =========================================================================
+  # DOCUMENTS
+  # =========================================================================
+  /documents:
+    get:
+      tags: [Documents]
+      summary: List documents
+      description: Returns documents accessible to the current user. Filterable by type, brand, and status.
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [investment, ownership, kyc, aml, banking, tax, contract, schedule, statement]
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [validated, pending, expired, missing, signed, review]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Paginated list of documents
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Documents]
+      summary: Upload document
+      description: Upload a new document to the vault.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [type, title, file]
+              properties:
+                type:
+                  type: string
+                  enum: [investment, ownership, kyc, aml, banking, tax, contract, schedule, statement]
+                title:
+                  type: string
+                  example: "Justificatif de domicile"
+                brandId:
+                  type: string
+                  nullable: true
+                expiresAt:
+                  type: string
+                  format: date
+                  nullable: true
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /documents/{id}:
+    put:
+      tags: [Documents]
+      summary: Update document metadata
+      description: Update document status or metadata (admin/compliance use).
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [validated, pending, expired, missing, signed, review]
+                expiresAt:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Document updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Documents]
+      summary: Delete document
+      description: Permanently removes a document. Requires admin role.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '204':
+          description: Document deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # =========================================================================
+  # NOTIFICATIONS
+  # =========================================================================
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Get notifications
+      description: Returns the notification feed for the current user, sorted newest-first.
+      parameters:
+        - name: unread
+          in: query
+          description: If true, returns only unread notifications
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Paginated notifications
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Notification'
+              example:
+                data:
+                  - id: n1
+                    kind: payment
+                    brand: atelier
+                    title: "Versement reçu · L'Atelier Châtelain"
+                    body: "1 248 € versés (échéance Mai)"
+                    read: false
+                    createdAt: "2026-05-16T09:00:00Z"
+                total: 7
+                page: 1
+                limit: 50
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      summary: Mark notification as read
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /notifications/read-all:
+    put:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      responses:
+        '200':
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                    description: Number of notifications updated
+                    example: 4
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # =========================================================================
+  # REGIONS
+  # =========================================================================
+  /regions:
+    get:
+      tags: [Regions]
+      summary: List regions
+      description: Returns all geographic regions used as reference data throughout the platform.
+      security: []
+      responses:
+        '200':
+          description: Array of regions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Region'
+              example:
+                - id: bxl
+                  code: bxl
+                  label: Bruxelles-Capitale
+                - id: wal
+                  code: wal
+                  label: Wallonie
+                - id: fla
+                  code: fla
+                  label: Flandre
+                - id: fr-nord
+                  code: fr-nord
+                  label: "France · Hauts-de-France"
+                - id: nl
+                  code: nl
+                  label: Pays-Bas
+
+  # =========================================================================
+  # LANDING
+  # =========================================================================
+  /landing:
+    get:
+      tags: [Landing]
+      summary: Get landing page content
+      description: Returns full CMS-managed content for the public landing page including hero, who-are-you tiles, portals, opportunities, pillars, and programs.
+      security: []
+      responses:
+        '200':
+          description: Landing page content object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hero:
+                    type: object
+                    properties:
+                      eyebrow:
+                        type: string
+                      title:
+                        type: string
+                      sub:
+                        type: string
+                      primaryCta:
+                        type: object
+                        properties:
+                          label:
+                            type: string
+                          action:
+                            type: string
+                      secondaryCta:
+                        type: object
+                        properties:
+                          label:
+                            type: string
+                          action:
+                            type: string
+                  whoAreYou:
+                    type: object
+                  portals:
+                    type: array
+                    items:
+                      type: object
+                  pillars:
+                    type: array
+                    items:
+                      type: object
+                  currentOpportunities:
+                    type: object
+                  join:
+                    type: object
+                  finalCta:
+                    type: object
+                  ecosystemTeaser:
+                    type: object
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # =========================================================================
+  # BACKOFFICE
+  # =========================================================================
+  /backoffice/dashboard:
+    get:
+      tags: [Backoffice]
+      summary: Get backoffice dashboard
+      description: Returns a comprehensive admin overview — active leads, pending documents, open tickets, recent registrations.
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activeCandidates:
+                    type: integer
+                    example: 24
+                  openLeads:
+                    type: integer
+                    example: 18
+                  pendingDocuments:
+                    type: integer
+                    example: 6
+                  openTickets:
+                    type: integer
+                    example: 3
+                  newBrandLeads:
+                    type: integer
+                    example: 2
+                  recentActivity:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [lead_created, lead_updated, ticket_opened, document_uploaded, candidate_registered]
+                        description:
+                          type: string
+                        at:
+                          type: string
+                          format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /backoffice/stats:
+    get:
+      tags: [Backoffice]
+      summary: Get platform statistics
+      description: Returns aggregate stats — leads by status, conversion funnel, brand performance.
+      parameters:
+        - name: period
+          in: query
+          description: Time period for stats
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, 12m]
+            default: 30d
+      responses:
+        '200':
+          description: Platform statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: string
+                    example: 30d
+                  leads:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      byStatus:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      conversionRate:
+                        type: number
+                        description: Percentage of leads reaching committee stage
+                  brands:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        brandId:
+                          type: string
+                        newLeads:
+                          type: integer
+                        openOpportunities:
+                          type: integer
+                  investors:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      newThisPeriod:
+                        type: integer
+                      totalInvested:
+                        type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ---------------------------------------------------------------------------
+# COMPONENTS
+# ---------------------------------------------------------------------------
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Resource identifier
+
+    brandId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [atelier, couq, cookies, mania]
+      description: Brand identifier
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: VALIDATION_ERROR
+            message: Request validation failed.
+            details:
+              - field: email
+                message: Must be a valid email address.
+
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: UNAUTHORIZED
+            message: A valid Bearer token is required.
+
+    Forbidden:
+      description: Authenticated but insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: FORBIDDEN
+            message: You do not have permission to access this resource.
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: NOT_FOUND
+            message: The requested resource was not found.
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: INTERNAL_ERROR
+            message: An unexpected error occurred. Please try again.
+
+  schemas:
+
+    # -------------------------------------------------------------------------
+    Brand:
+      type: object
+      description: A franchise brand in the FG ecosystem
+      properties:
+        id:
+          type: string
+          example: atelier
+          description: Unique slug identifier
+        name:
+          type: string
+          example: "L'Atelier By"
+        tagline:
+          type: string
+          example: "Boulangerie de quartier · Belgique"
+        kind:
+          type: string
+          example: "Boulangerie · Pâtisserie"
+          description: Category / concept type
+        city:
+          type: string
+          example: Bruxelles
+        headquarters:
+          type: string
+          example: "Bruxelles, BE"
+        founded:
+          type: integer
+          example: 2022
+        established:
+          type: string
+          example: "5 magasins"
+          description: Human-readable network size
+        logoSrc:
+          type: string
+          format: uri
+          nullable: true
+          example: "img/logo.png"
+        logoMark:
+          type: string
+          example: A
+          description: Single character or symbol used as a fallback logo mark
+        theme:
+          type: string
+          example: atelier
+          description: CSS theme class applied when displaying this brand
+        tokens:
+          $ref: '#/components/schemas/BrandTokens'
+        kpiLabels:
+          type: object
+          properties:
+            ca:
+              type: string
+            profit:
+              type: string
+            cust:
+              type: string
+            basket:
+              type: string
+        copy:
+          type: object
+          properties:
+            ecoNoun:
+              type: string
+              example: magasin
+            ecoNounPlural:
+              type: string
+              example: magasins
+            verdict:
+              type: string
+              example: "Sur la trajectoire"
+
+    # -------------------------------------------------------------------------
+    BrandTokens:
+      type: object
+      description: Brand design system tokens (colors, typography)
+      properties:
+        primary:
+          type: string
+          example: "#8D1D2C"
+        secondary:
+          type: string
+          example: "#F2C9A0"
+        ink:
+          type: string
+          example: "#1c1a17"
+        bg:
+          type: string
+          example: "#EAE4DC"
+        surface:
+          type: string
+          example: "#FFFFFF"
+        accent:
+          type: string
+          example: "#8D1D2C"
+        fontDisplay:
+          type: string
+          example: '"DM Sans", system-ui, sans-serif'
+        fontUi:
+          type: string
+          example: '"DM Sans", system-ui, sans-serif'
+        fontAccent:
+          type: string
+          example: '"DM Sans", system-ui, sans-serif'
+
+    # -------------------------------------------------------------------------
+    BrandPresentation:
+      type: object
+      description: Full CMS-managed investor presentation for a brand
+      properties:
+        hero:
+          type: object
+          properties:
+            baseline:
+              type: string
+              example: "La boulangerie de quartier, au geste artisanal."
+            concept:
+              type: string
+            message:
+              type: string
+            cta:
+              type: string
+            secondaryCta:
+              type: string
+            media:
+              type: string
+              format: uri
+              nullable: true
+        carousel:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [image, kpi, concept, text, highlight]
+              src:
+                type: string
+                nullable: true
+              caption:
+                type: string
+                nullable: true
+              title:
+                type: string
+                nullable: true
+              body:
+                type: string
+                nullable: true
+              metrics:
+                type: array
+                nullable: true
+                items:
+                  type: object
+                  properties:
+                    label:
+                      type: string
+                    value:
+                      type: string
+        videos:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [main, founder, tour]
+              thumb:
+                type: string
+                nullable: true
+              title:
+                type: string
+              desc:
+                type: string
+              duration:
+                type: string
+        concept:
+          type: object
+          properties:
+            explanation:
+              type: string
+            targetCustomers:
+              type: array
+              items:
+                type: string
+            positioning:
+              type: string
+            strengths:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  body:
+                    type: string
+            franchiseModel:
+              type: string
+            vision:
+              type: string
+        investment:
+          type: object
+          properties:
+            minTicket:
+              type: integer
+              example: 5000
+            roiTarget:
+              type: number
+              example: 8.4
+            payback:
+              type: string
+              example: "4,8 ans"
+            openOpps:
+              type: integer
+              example: 1
+            networkSize:
+              type: integer
+              example: 47
+            networkPerfLabel:
+              type: string
+              example: "+8,4 % CA moyen vs budget 2025"
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+              title:
+                type: string
+              size:
+                type: string
+              url:
+                type: string
+                format: uri
+                nullable: true
+        team:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              person:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  desc:
+                    type: string
+                  contact:
+                    type: boolean
+        opportunitiesPitch:
+          type: string
+
+    # -------------------------------------------------------------------------
+    Shop:
+      type: object
+      description: A physical franchise shop location
+      properties:
+        id:
+          type: string
+          example: couq-chatelain
+        brandId:
+          type: string
+          example: couq
+        name:
+          type: string
+          example: "Couq Châtelain"
+        city:
+          type: string
+          example: Bruxelles
+        kind:
+          type: string
+          example: Boulangerie
+        regionId:
+          type: string
+          example: bxl
+        address:
+          type: string
+          nullable: true
+        surfaceM2:
+          type: integer
+          nullable: true
+        opened:
+          type: string
+          example: "Juin 2024"
+        status:
+          type: string
+          enum: [open, pre-opening, closed, paused]
+        health:
+          type: string
+          enum: [good, at-risk, critical]
+          example: good
+        photoUrl:
+          type: string
+          format: uri
+          nullable: true
+        kpiSnapshot:
+          type: object
+          properties:
+            ca:
+              type: integer
+              description: Monthly revenue in EUR
+            profit:
+              type: number
+              description: Net profit margin percentage
+            cust:
+              type: integer
+              description: Average customers per day
+            basket:
+              type: number
+              description: Average basket in EUR
+            vsBudget:
+              type: number
+              description: Revenue vs budget percentage
+        consultant:
+          type: object
+          nullable: true
+          properties:
+            name:
+              type: string
+            lastVisit:
+              type: string
+            verdict:
+              type: string
+              enum: [on-track, at-risk, critical]
+            summary:
+              type: string
+            action:
+              type: string
+        franchisee:
+          type: object
+          nullable: true
+          properties:
+            name:
+              type: string
+            tier:
+              type: string
+            overall:
+              type: number
+            since:
+              type: string
+
+    # -------------------------------------------------------------------------
+    Opportunity:
+      type: object
+      description: A franchise or investment opportunity on the marketplace
+      properties:
+        id:
+          type: string
+          example: op-gent
+        brand:
+          type: string
+          example: atelier
+        name:
+          type: string
+          example: "L'Atelier Gand"
+        city:
+          type: string
+          example: Gent
+        region:
+          type: string
+          example: fla
+        format:
+          type: string
+          example: "Boutique 84 m²"
+        openingDate:
+          type: string
+          example: "Q3 2026"
+        requiredInvest:
+          type: integer
+          example: 320000
+          description: Total investment required in EUR
+        candidateContrib:
+          type: integer
+          example: 60000
+          description: Candidate personal contribution in EUR
+        financingNeed:
+          type: string
+          example: "Tax shelter + prêt investisseur"
+        payback:
+          type: string
+          example: "4,8 ans"
+        status:
+          type: string
+          example: "Closing imminent"
+        description:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        type:
+          type: string
+          enum: [franchise, investment, new-brand]
+        target:
+          type: integer
+          nullable: true
+          description: Total fundraising target in EUR
+        raised:
+          type: integer
+          nullable: true
+          description: Amount raised to date in EUR
+        ticketMin:
+          type: integer
+          nullable: true
+          description: Minimum investment ticket in EUR
+        roiTarget:
+          type: number
+          nullable: true
+        closingDays:
+          type: integer
+          nullable: true
+          description: Days remaining until closing
+        risk:
+          type: string
+          nullable: true
+          enum: [Faible, Modéré, Élevé]
+        createdAt:
+          type: string
+          format: date-time
+
+    # -------------------------------------------------------------------------
+    Candidate:
+      type: object
+      description: A franchise candidate profile
+      properties:
+        id:
+          type: string
+          example: cand-001
+        firstName:
+          type: string
+          example: Marie
+        lastName:
+          type: string
+          example: Lemoine
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          example: "+32 478 11 22 33"
+        address:
+          type: string
+        preferredRegion:
+          type: string
+          example: bxl
+        language:
+          type: string
+          example: "Français · Néerlandais (B2) · Anglais (C1)"
+        experience:
+          type: string
+        currentSituation:
+          type: string
+          example: "En poste · disponible à 3 mois"
+        motivation:
+          type: string
+        budget:
+          type: integer
+          description: Personal capital contribution in EUR
+          example: 75000
+        financingCapacity:
+          type: string
+        brandPreference:
+          type: array
+          items:
+            type: string
+          example: [cookies, couq]
+        locationPreference:
+          type: string
+        generalStatus:
+          type: string
+          enum: [to-analyse, in-discussion, recommended, validated, rejected, on-hold]
+          example: "En pré-analyse"
+        internalNotes:
+          type: string
+          description: Consultant-only notes (not shown to candidate)
+        createdAt:
+          type: string
+          format: date-time
+
+    CandidateCreate:
+      type: object
+      required: [firstName, lastName, email, phone, preferredRegion, budget]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        address:
+          type: string
+        preferredRegion:
+          type: string
+        language:
+          type: string
+        experience:
+          type: string
+        currentSituation:
+          type: string
+        motivation:
+          type: string
+        budget:
+          type: integer
+        financingCapacity:
+          type: string
+        brandPreference:
+          type: array
+          items:
+            type: string
+        locationPreference:
+          type: string
+
+    # -------------------------------------------------------------------------
+    CandidateLead:
+      type: object
+      description: A link between a candidate and a specific opportunity, tracked through the pipeline
+      properties:
+        id:
+          type: string
+          example: opp-link-001
+        candidateId:
+          type: string
+          example: cand-001
+        opportunityId:
+          type: string
+          example: op-bxl-cookies
+        brand:
+          type: string
+          example: cookies
+        projectType:
+          type: string
+          example: Kiosque
+        location:
+          type: string
+          example: "Bruxelles · Galerie Toison d'Or"
+        validationStatus:
+          type: string
+          enum: [to-analyse, in-discussion, recommended, validated, rejected, on-hold]
+          example: recommended
+        fitScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 92
+        consultantId:
+          type: string
+          nullable: true
+        consultantNotes:
+          type: string
+        documents:
+          type: array
+          items:
+            type: string
+          description: List of requested/submitted document names
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              at:
+                type: string
+                example: "12 mai 2026"
+              author:
+                type: string
+              body:
+                type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # -------------------------------------------------------------------------
+    Investor:
+      type: object
+      description: An investor profile
+      properties:
+        id:
+          type: string
+          example: inv_001
+        userId:
+          type: string
+        name:
+          type: string
+          example: Claire Vermeulen
+        initials:
+          type: string
+          example: CV
+        email:
+          type: string
+          format: email
+          example: claire.vermeulen@example.com
+        phone:
+          type: string
+          example: "+32 477 12 34 56"
+        address:
+          type: string
+          example: "Avenue Louise 142 · 1050 Bruxelles"
+        nationality:
+          type: string
+          example: Belge
+        iban:
+          type: string
+          example: "BE68 5390 0754 7034"
+        role:
+          type: string
+          example: "Investisseur particulier"
+        tier:
+          type: string
+          enum: [Bronze, Argent, Or, Privilège]
+          example: Privilège
+        since:
+          type: string
+          example: "Juin 2023"
+        totalInvested:
+          type: number
+        totalValuation:
+          type: number
+        totalPaid:
+          type: number
+        remaining:
+          type: number
+
+    # -------------------------------------------------------------------------
+    InvestorPortfolio:
+      type: object
+      description: Full investor portfolio grouped by brand
+      properties:
+        summary:
+          type: object
+          properties:
+            totalInvested:
+              type: number
+              example: 85000
+            totalRepaid:
+              type: number
+              example: 8580
+            totalValuation:
+              type: number
+              example: 91200
+            roiTarget:
+              type: number
+              example: 8.4
+            roiCurrent:
+              type: number
+              example: 8.0
+        brands:
+          type: array
+          items:
+            type: object
+            properties:
+              brandId:
+                type: string
+              summary:
+                type: object
+                properties:
+                  invested:
+                    type: number
+                  repaid:
+                    type: number
+                  valuation:
+                    type: number
+                  roiTarget:
+                    type: number
+                  roiCurrent:
+                    type: number
+              ca12m:
+                type: array
+                items:
+                  type: integer
+                description: Monthly revenue series for the past 12 months
+              budget12m:
+                type: array
+                items:
+                  type: integer
+                description: Monthly budget series for the past 12 months
+              shops:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Shop'
+
+    # -------------------------------------------------------------------------
+    Lead:
+      type: object
+      description: A candidate lead in the consultant pipeline
+      properties:
+        id:
+          type: string
+          example: lead-001
+        candidate:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+            phone:
+              type: string
+            region:
+              type: string
+            capital:
+              type: string
+        opportunityId:
+          type: string
+        currentStep:
+          type: string
+          enum: [interested, consultant-review, first-contact-planned, first-contact-done,
+                 financing-precheck, location-validation, business-plan, committee,
+                 contract-prep, training-planning, opening-planning]
+        assignedTo:
+          type: object
+          properties:
+            name:
+              type: string
+            role:
+              type: string
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        source:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdate:
+          type: string
+        notes:
+          type: string
+        nextAction:
+          type: string
+        requestedDocuments:
+          type: array
+          items:
+            type: string
+        appointments:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+              when:
+                type: string
+              status:
+                type: string
+                enum: [planned, done, cancelled]
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: string
+                enum: [consultant, candidate, admin]
+              name:
+                type: string
+              body:
+                type: string
+              time:
+                type: string
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              step:
+                type: string
+              at:
+                type: string
+              by:
+                type: string
+
+    # -------------------------------------------------------------------------
+    Consultant:
+      type: object
+      description: A franchise consultant profile
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        fullName:
+          type: string
+          example: Sophie Renard
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        role:
+          type: string
+          example: "Consultante · Réseau Bruxelles"
+        activeLeads:
+          type: integer
+          example: 8
+        performanceScore:
+          type: number
+          example: 4.7
+        createdAt:
+          type: string
+          format: date-time
+
+    # -------------------------------------------------------------------------
+    Developer:
+      type: object
+      description: A real estate developer proposing commercial locations
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+          nullable: true
+        fullName:
+          type: string
+          example: "Jean-Marc Dumont"
+        company:
+          type: string
+          example: "Dumont Immobilier SA"
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        city:
+          type: string
+        surfaceM2:
+          type: integer
+          example: 120
+        rent:
+          type: integer
+          example: 3500
+          description: Monthly rent in EUR
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, pending]
+        createdAt:
+          type: string
+          format: date-time
+
+    DeveloperCreate:
+      type: object
+      required: [fullName, email, phone, city, surfaceM2]
+      properties:
+        fullName:
+          type: string
+        company:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        city:
+          type: string
+        surfaceM2:
+          type: integer
+        rent:
+          type: integer
+        description:
+          type: string
+
+    # -------------------------------------------------------------------------
+    SupportTicket:
+      type: object
+      description: A helpdesk support ticket
+      properties:
+        id:
+          type: string
+          example: t-001
+        userId:
+          type: string
+        categoryId:
+          type: string
+          enum: [investment, repayment, technical, document, legal, opportunity, general]
+          example: document
+        priorityId:
+          type: string
+          enum: [low, normal, high, urgent]
+          example: high
+        subject:
+          type: string
+          example: "Justificatif de domicile à renouveler"
+        status:
+          type: string
+          enum: [open, resolved, awaiting-investor, awaiting-admin]
+          example: awaiting-investor
+        brandId:
+          type: string
+          nullable: true
+        assignedTo:
+          type: string
+          example: "Émilie Devos · Conformité"
+        origin:
+          type: string
+          enum: [investor, admin, system]
+          example: admin
+        unreadMessages:
+          type: integer
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportMessage'
+
+    # -------------------------------------------------------------------------
+    SupportMessage:
+      type: object
+      description: A message within a support ticket thread
+      properties:
+        id:
+          type: string
+          example: m-001
+        ticketId:
+          type: string
+        fromType:
+          type: string
+          enum: [investor, admin, system]
+          example: admin
+        authorName:
+          type: string
+          example: "Émilie Devos"
+        content:
+          type: string
+          example: "Bonjour Claire, votre justificatif de domicile date de plus de 2 ans..."
+        unread:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              filename:
+                type: string
+              url:
+                type: string
+                format: uri
+              size:
+                type: string
+
+    # -------------------------------------------------------------------------
+    Document:
+      type: object
+      description: A document in the platform vault (contract, KYC, schedule, etc.)
+      properties:
+        id:
+          type: string
+          example: d-kyc-id
+        ownerId:
+          type: string
+          description: ID of the investor or candidate who owns this document
+        ownerType:
+          type: string
+          enum: [investor, candidate]
+        brandId:
+          type: string
+          nullable: true
+          example: atelier
+        type:
+          type: string
+          enum: [investment, ownership, kyc, aml, banking, tax, contract, schedule, statement]
+          example: kyc
+        status:
+          type: string
+          enum: [validated, pending, expired, missing, signed, review]
+          example: validated
+        title:
+          type: string
+          example: "Pièce d'identité — Carte d'identité belge"
+        sub:
+          type: string
+          example: "Recto + verso"
+        filename:
+          type: string
+          nullable: true
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Signed download URL (time-limited)
+        size:
+          type: string
+          nullable: true
+          example: "2,4 MB"
+        date:
+          type: string
+          description: Document date (formatted)
+          example: "15/06/2023"
+        expiresAt:
+          type: string
+          format: date
+          nullable: true
+          example: "2033-06-15"
+        createdAt:
+          type: string
+          format: date-time
+
+    # -------------------------------------------------------------------------
+    Notification:
+      type: object
+      description: A user notification
+      properties:
+        id:
+          type: string
+          example: n1
+        userId:
+          type: string
+        kind:
+          type: string
+          enum: [payment, report, doc, opp, system]
+          example: payment
+        brand:
+          type: string
+          nullable: true
+          example: atelier
+        title:
+          type: string
+          example: "Versement reçu · L'Atelier Châtelain"
+        body:
+          type: string
+          example: "1 248 € versés (échéance Mai)"
+        read:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-05-16T07:00:00Z"
+
+    # -------------------------------------------------------------------------
+    Region:
+      type: object
+      description: A geographic region reference
+      properties:
+        id:
+          type: string
+          example: bxl
+        code:
+          type: string
+          example: bxl
+        label:
+          type: string
+          example: Bruxelles-Capitale
+
+    # -------------------------------------------------------------------------
+    JWTResponse:
+      type: object
+      description: Successful authentication response
+      properties:
+        token:
+          type: string
+          description: JWT Bearer token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expiresIn:
+          type: integer
+          description: Token lifetime in seconds
+          example: 86400
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            role:
+              type: string
+              enum: [admin, investor, candidate, consultant, developer, brand]
+            name:
+              type: string
+
+    # -------------------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Human-readable error description
+          example: Request validation failed.
+        details:
+          type: array
+          nullable: true
+          description: Field-level validation errors
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    # -------------------------------------------------------------------------
+    PaginatedList:
+      type: object
+      description: Generic paginated list wrapper
+      properties:
+        data:
+          type: array
+          items: {}
+          description: Array of result items
+        total:
+          type: integer
+          description: Total number of matching records
+          example: 42
+        page:
+          type: integer
+          description: Current page number (1-indexed)
+          example: 1
+        limit:
+          type: integer
+          description: Number of items per page
+          example: 20
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 3

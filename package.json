@@ -1,0 +1,14 @@
+{
+  "name": "franchise-generation",
+  "version": "1.0.0",
+  "description": "Franchise Generation — multi-brand franchise ecosystem portal",
+  "private": true,
+  "scripts": {
+    "api": "cd backend && npm start",
+    "api:dev": "cd backend && npm run dev",
+    "seed": "cd backend && npm run seed"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

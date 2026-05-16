@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Franchise Generation — Écosystème</title>
+<link rel="stylesheet" href="fg.css" />
+</head>
+<body class="fg-mode">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="fg-data.js"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useRef, useEffect } = React;
+
+// API-driven slides (would come from CMS in production)
+const SLIDES = [
+  { id: 'production',  title: 'Production',           body: 'Nos ateliers et cuisines centrales préparent les bases et produits clés du réseau.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M10 50V28l22-14 22 14v22"/><path d="M10 50h44"/><rect x="22" y="34" width="8" height="16"/><rect x="34" y="34" width="8" height="10"/><circle cx="38" cy="50" r="1.5"/></svg>) },
+  { id: 'logistique', title: 'Logistique',           body: 'Organisation des livraisons, tournées, stocks et flux entre production et magasins.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 40V20h32v20"/><path d="M36 26h14l8 10v4"/><circle cx="16" cy="46" r="6"/><circle cx="46" cy="46" r="6"/><path d="M22 40h18"/></svg>) },
+  { id: 'fournisseurs', title: 'Fournisseurs',        body: 'Réseau de fournisseurs sélectionnés pour garantir qualité, prix et régularité.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="32" cy="32" r="22"/><path d="M14 24h36M14 40h36M32 10c-6 6-6 38 0 44M32 10c6 6 6 38 0 44"/></svg>) },
+  { id: 'produits', title: 'Produits',             body: 'Recettes, fiches techniques, portions, allergènes et standards produits centralisés.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><rect x="12" y="10" width="40" height="44" rx="3"/><path d="M20 22h24M20 30h24M20 38h18M20 46h12"/></svg>) },
+  { id: 'consultants', title: 'Consultants',          body: 'Accompagnement terrain pour l\'ouverture, la gestion, la qualité et les performances.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="32" cy="22" r="10"/><path d="M12 54a20 20 0 0 1 40 0"/><path d="M44 18l4-4M48 14h-4M48 14v-4"/></svg>) },
+  { id: 'formation', title: 'Formation',            body: 'Parcours de formation pour apprendre le métier, les outils et les standards.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 24l28-12 28 12-28 12L4 24z"/><path d="M14 30v12c0 4 8 8 18 8s18-4 18-8V30"/><path d="M58 24v14"/></svg>) },
+  { id: 'marketing', title: 'Marketing',            body: 'Campagnes, visuels, communication locale et outils de développement commercial.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8 32c0-8 4-12 12-12l24-8v40l-24-8c-8 0-12-4-12-12z"/><path d="M44 22c4 0 8 4 8 10s-4 10-8 10"/><path d="M22 40v8a4 4 0 0 0 8 0v-4"/></svg>) },
+  { id: 'finance', title: 'Finance & reporting',  body: 'Suivi des KPI, marges, ventes, objectifs et performance du magasin.',
+    icon: (<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 50V20M6 50h52"/><rect x="14" y="32" width="8" height="14"/><rect x="28" y="22" width="8" height="24"/><rect x="42" y="38" width="8" height="8"/><path d="M14 22l16-8 16 4 8-6"/></svg>) }
+];
+
+function App() {
+  const [idx, setIdx] = useState(0);
+  const trackRef = useRef(null);
+
+  const go = (delta) => setIdx(i => (i + delta + SLIDES.length) % SLIDES.length);
+
+  useEffect(() => {
+    const t = trackRef.current;
+    if (!t) return;
+    const child = t.children[idx];
+    if (child) t.scrollTo({ left: child.offsetLeft - (t.clientWidth - child.offsetWidth) / 2, behavior: 'smooth' });
+  }, [idx]);
+
+  // Keyboard
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight') go(1);
+      if (e.key === 'ArrowLeft') go(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  return (
+    <div className="eco">
+      <header className="lp-topbar">
+        <a href="landing.html"><img src="img/fg-logo.png" alt="Franchise Generation" className="lp-topbar__logo" /></a>
+        <nav className="lp-topbar__nav">
+          <a href="landing.html">Accueil</a>
+          <a href="ecosystem.html" className="is-active" style={{ color: 'var(--brand-ink)', fontWeight: 600 }}>Écosystème</a>
+          <a href="candidate.html">Espace candidat</a>
+          <a href="index.html" className="lp-btn lp-btn--ghost lp-btn--sm">Connexion investisseur →</a>
+        </nav>
+      </header>
+
+      <main className="eco-main">
+        <section className="eco-hero">
+          <p className="eco-hero__eyebrow">Notre écosystème</p>
+          <h1 className="eco-hero__title">Vous ne rejoignez pas une marque,<br /><em>vous rejoignez un réseau complet.</em></h1>
+          <p className="eco-hero__sub">
+            Production centralisée, logistique structurée, consultants terrain, formation, marketing et reporting.
+            Vous ouvrez votre magasin. On s'occupe du reste.
+          </p>
+        </section>
+
+        <section className="eco-car">
+          <button className="eco-car__arrow eco-car__arrow--prev" onClick={() => go(-1)} aria-label="Précédent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+
+          <div className="eco-car__track" ref={trackRef}>
+            {SLIDES.map((s, i) => (
+              <article key={s.id}
+                className={'eco-slide' + (i === idx ? ' is-active' : (i === idx - 1 || (idx === 0 && i === SLIDES.length - 1) ? ' is-prev' : (i === idx + 1 || (idx === SLIDES.length - 1 && i === 0) ? ' is-next' : '')))}
+                onClick={() => setIdx(i)}>
+                <div className="eco-slide__index">{String(i + 1).padStart(2, '0')} / {String(SLIDES.length).padStart(2, '0')}</div>
+                <div className="eco-slide__icon">{s.icon}</div>
+                <h2 className="eco-slide__title">{s.title}</h2>
+                <p className="eco-slide__body">{s.body}</p>
+              </article>
+            ))}
+          </div>
+
+          <button className="eco-car__arrow eco-car__arrow--next" onClick={() => go(1)} aria-label="Suivant">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </section>
+
+        <div className="eco-dots">
+          {SLIDES.map((s, i) => (
+            <button key={s.id}
+              className={'eco-dot' + (i === idx ? ' is-active' : '')}
+              onClick={() => setIdx(i)}
+              aria-label={s.title}>
+              <span className="eco-dot__label">{s.title}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="eco-cta">
+          <a href="landing.html#lp-join" className="lp-btn lp-btn--primary lp-btn--lg">
+            Découvrir comment nous vous accompagnons
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </main>
+
+      <footer className="lp-footer" style={{ marginTop: 64 }}>
+        <div className="lp-footer__copy">
+          <img src="img/fg-logo.png" alt="Franchise Generation" className="lp-footer__logo" />
+          <p>© 2026 Franchise Generation</p>
+        </div>
+        <div className="lp-footer__links">
+          <a href="landing.html">Accueil</a>
+          <a href="ecosystem.html">Écosystème</a>
+          <a href="#">Contact</a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
