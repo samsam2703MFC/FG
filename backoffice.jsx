@@ -486,6 +486,111 @@ function BoBrands({ ctx }) {
 }
 
 // ====================================================================
+// CONSULTANT DETAIL PANEL
+// ====================================================================
+function ConsultantDetailPanel({ consultant, leads, allOpps, onClose }) {
+  const [expanded, setExpanded] = bState({});
+  const toggle = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
+
+  return (
+    <>
+      <div className="bo-panel-backdrop" onClick={onClose} />
+      <aside className="bo-panel" style={{ maxWidth: 560 }}>
+        <header className="bo-panel__head">
+          <div>
+            <p className="bo-panel__eyebrow">Consultant · Profil</p>
+            <h2 className="bo-panel__title">{consultant.name}</h2>
+            <p className="bo-panel__sub">{consultant.role}</p>
+          </div>
+          <button className="bo-panel__close" onClick={onClose}>✕</button>
+        </header>
+
+        <div className="bo-panel__body">
+          {/* Stats */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 32, fontSize: 13 }}>
+            <div>
+              <p style={{ color: 'rgba(14,27,40,.5)', marginBottom: 2 }}>Leads actifs</p>
+              <strong>{leads.length}</strong>
+            </div>
+            <div>
+              <p style={{ color: 'rgba(14,27,40,.5)', marginBottom: 2 }}>Performance</p>
+              <BoStatus tone="success">{consultant.perf}</BoStatus>
+            </div>
+            <div>
+              <p style={{ color: 'rgba(14,27,40,.5)', marginBottom: 2 }}>Validations</p>
+              <strong>{leads.filter(l => { const o = allOpps.find(o => o.id === l.opportunity); return o?.validatedCandidateId === l.id; }).length}</strong>
+            </div>
+          </div>
+
+          {/* Leads section */}
+          <div style={{ padding: '12px 20px 6px' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', color: 'rgba(14,27,40,.45)', textTransform: 'uppercase', marginBottom: 10 }}>
+              Candidats assignés ({leads.length})
+            </p>
+          </div>
+
+          {!leads.length && (
+            <div className="bo-panel__empty">Aucun lead assigné à ce consultant.</div>
+          )}
+
+          {leads.map(lead => {
+            const opp = allOpps.find(o => o.id === lead.opportunity) || { id: lead.opportunity, name: lead.opportunity };
+            const isClosed = opp.status === 'closed-won';
+            const isWinner = isClosed && opp.validatedCandidateId === lead.id;
+            const isOpen = expanded[lead.id];
+
+            return (
+              <div key={lead.id} className={`bo-candidate-card${lead.priority === 'high' ? ' bo-candidate-card--high' : ''}`}>
+                {/* Header row — always visible, click to expand */}
+                <div className="bo-candidate-card__top" style={{ cursor: 'pointer' }} onClick={() => toggle(lead.id)}>
+                  <div className="bo-candidate-card__info" style={{ flex: 1 }}>
+                    <p className="bo-candidate-card__name" style={{ fontSize: 14 }}>{lead.candidate.name}</p>
+                    <p className="bo-candidate-card__contact">{lead.candidate.email}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <BoStatus tone={stepTone(lead.currentStep)}>
+                      {STEP_LABELS[lead.currentStep] || lead.currentStep}
+                    </BoStatus>
+                    {isWinner && <span className="bo-validated-badge">✓ Validé</span>}
+                    {isClosed && !isWinner && <BoStatus tone="muted">Non retenu</BoStatus>}
+                    <span style={{ fontSize: 11, color: 'rgba(14,27,40,.4)', marginLeft: 4 }}>{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </div>
+
+                {/* Dropdown detail — visible when expanded */}
+                {isOpen && (
+                  <div style={{ padding: '10px 0 4px', borderTop: '1px solid var(--border)', fontSize: 13 }}>
+                    <div className="bo-candidate-card__pipeline" style={{ marginBottom: 8 }}>
+                      <span style={{ color: 'rgba(14,27,40,.5)' }}>Opportunité:</span>
+                      <strong style={{ marginLeft: 4 }}>{opp.name}</strong>
+                      {(opp.city || opp.location) && <span style={{ color: 'rgba(14,27,40,.45)', marginLeft: 4 }}>· {opp.city || opp.location}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 24, padding: '0 0 8px', flexWrap: 'wrap' }}>
+                      {lead.candidate.phone && (
+                        <div><p style={{ color: 'rgba(14,27,40,.45)', marginBottom: 2, fontSize: 11 }}>Téléphone</p><span>{lead.candidate.phone}</span></div>
+                      )}
+                      <div><p style={{ color: 'rgba(14,27,40,.45)', marginBottom: 2, fontSize: 11 }}>Source</p><span>{lead.source}</span></div>
+                      <div><p style={{ color: 'rgba(14,27,40,.45)', marginBottom: 2, fontSize: 11 }}>Priorité</p><BoStatus tone={lead.priority === 'high' ? 'warning' : 'neutral'}>{lead.priority || 'normal'}</BoStatus></div>
+                    </div>
+                    {lead.notes && (
+                      <p className="bo-candidate-card__notes" style={{ marginTop: 4 }}>{lead.notes}</p>
+                    )}
+                    <div className="bo-candidate-card__foot">
+                      <span>Prochaine action: {lead.nextAction || '—'}</span>
+                      <span>Créé: {lead.createdAt?.slice(0, 10)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ====================================================================
 // CANDIDATES
 // ====================================================================
 function CandidateDetailPanel({ candidate, leads, allOpps, closedMap, onClose, onRequestValidate }) {
@@ -834,12 +939,21 @@ function BoDevelopers({ ctx }) {
 // CONSULTANTS
 // ====================================================================
 function BoConsultants({ ctx }) {
+  const { FG } = ctx;
+  const [selectedConsultant, setSelectedConsultant] = bState(null);
+
   const consultants = [
-    { id: 'c1', name: 'Sophie Renard', role: 'Consultante · Réseau Bruxelles', leads: 8, perf: 'Top 10%' },
-    { id: 'c2', name: 'Karim Boulahia', role: 'Consultant · Réseau Wallonie', leads: 5, perf: 'Top 20%' },
-    { id: 'c3', name: 'Lara Wauters', role: 'Consultante · Couq',           leads: 6, perf: 'Top 15%' },
-    { id: 'c4', name: 'Niels Vandenberg', role: 'Consultant · Flandre',      leads: 4, perf: 'Standard' }
+    { id: 'c1', name: 'Sophie Renard',    role: 'Consultante · Réseau Bruxelles', perf: 'Top 10%' },
+    { id: 'c2', name: 'Karim Boulahia',   role: 'Consultant · Réseau Wallonie',   perf: 'Top 20%' },
+    { id: 'c3', name: 'Lara Wauters',     role: 'Consultante · Couq',             perf: 'Top 15%' },
+    { id: 'c4', name: 'Niels Vandenberg', role: 'Consultant · Flandre',           perf: 'Standard' }
   ];
+
+  const leadsFor = (consultant) =>
+    (FG.CANDIDATE_LEADS || []).filter(l => l.assignedTo?.name === consultant.name);
+
+  const allOpps = FG.ONBOARDING_OPPORTUNITIES || [];
+
   return (
     <>
       <BoHead eyebrow="People · Consultants" title="Consultants & operations"
@@ -847,6 +961,7 @@ function BoConsultants({ ctx }) {
         actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-lead', { type: 'consultant' })}><BoIcon.plus />Add consultant</button>)}
       />
       <BoTable
+        onRow={setSelectedConsultant}
         columns={[
           { k: 'name', l: 'Consultant', render: (r) => (
             <span className="bo-cell-brand">
@@ -857,12 +972,23 @@ function BoConsultants({ ctx }) {
               </span>
             </span>
           )},
-          { k: 'leads', l: 'Active leads' },
-          { k: 'perf', l: 'Performance', render: (r) => <BoStatus tone="success">{r.perf}</BoStatus> },
-          { k: 'go', l: '', align: 'right', render: () => <a className="bo-btn bo-btn--ghost bo-btn--xs" href="consultant.html">Open →</a> }
+          { k: 'leads', l: 'Active leads', render: (r) => leadsFor(r).length },
+          { k: 'perf',  l: 'Performance',  render: (r) => <BoStatus tone="success">{r.perf}</BoStatus> },
+          { k: 'go', l: '', align: 'right', render: (r) => (
+            <button className="bo-btn bo-btn--ghost bo-btn--xs" onClick={e => { e.stopPropagation(); setSelectedConsultant(r); }}>Voir →</button>
+          )}
         ]}
         rows={consultants}
       />
+
+      {selectedConsultant && (
+        <ConsultantDetailPanel
+          consultant={selectedConsultant}
+          leads={leadsFor(selectedConsultant)}
+          allOpps={allOpps}
+          onClose={() => setSelectedConsultant(null)}
+        />
+      )}
     </>
   );
 }
