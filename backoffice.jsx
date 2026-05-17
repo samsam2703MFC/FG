@@ -41,31 +41,26 @@ const NAV_GROUPS = [
   { label: 'Overview', items: [
     { id: 'dashboard', label: 'Dashboard', icon: BoIcon.dashboard }
   ]},
-  { label: 'People', items: [
-    { id: 'candidates',  label: 'Candidates',  icon: BoIcon.candidate, badgeKey: 'leads' },
-    { id: 'investors',   label: 'Investors',   icon: BoIcon.investor },
-    { id: 'developers',  label: 'Developers',  icon: BoIcon.developer },
-    { id: 'consultants', label: 'Consultants', icon: BoIcon.consultant },
-    { id: 'franchisees', label: 'Franchisees', icon: BoIcon.shop }
+  { label: 'Pipeline', items: [
+    { id: 'opportunities', label: 'Opportunities', icon: BoIcon.opportunity, badgeKey: 'opps' },
+    { id: 'candidates',   label: 'Candidates',    icon: BoIcon.candidate,   badgeKey: 'leads' },
+    { id: 'crm',          label: 'CRM & Leads',   icon: BoIcon.crm,         badgeKey: 'newleads' }
   ]},
   { label: 'Network', items: [
-    { id: 'brands',         label: 'Brands',         icon: BoIcon.brand, badgeKey: 'brands' },
-    { id: 'shops',          label: 'Shops',          icon: BoIcon.shop, badgeKey: 'shops' },
-    { id: 'opportunities',  label: 'Opportunities',  icon: BoIcon.opportunity, badgeKey: 'opps' },
-    { id: 'crm',            label: 'CRM & Leads',    icon: BoIcon.crm, badgeKey: 'newleads' }
+    { id: 'brands',      label: 'Brands',      icon: BoIcon.brand,     badgeKey: 'brands' },
+    { id: 'shops',       label: 'Shops',       icon: BoIcon.shop,      badgeKey: 'shops' },
+    { id: 'franchisees', label: 'Franchisees', icon: BoIcon.candidate }
   ]},
-  { label: 'Operations', items: [
-    { id: 'documents',    label: 'Documents',    icon: BoIcon.doc },
-    { id: 'communication',label: 'Communication',icon: BoIcon.comm, badgeKey: 'unread' },
-    { id: 'training',     label: 'Training',     icon: BoIcon.training },
-    { id: 'finance',      label: 'Finance',      icon: BoIcon.finance }
+  { label: 'People', items: [
+    { id: 'investors',   label: 'Investors',   icon: BoIcon.investor },
+    { id: 'consultants', label: 'Consultants', icon: BoIcon.consultant },
+    { id: 'developers',  label: 'Developers',  icon: BoIcon.developer }
   ]},
   { label: 'Platform', items: [
-    { id: 'website',     label: 'Public Website', icon: BoIcon.web },
-    { id: 'roles',       label: 'Roles & Permissions', icon: BoIcon.roles },
-    { id: 'visibility',  label: 'Visibility',     icon: BoIcon.visibility },
-    { id: 'automation',  label: 'Automation',     icon: BoIcon.automate },
-    { id: 'settings',    label: 'Settings',       icon: BoIcon.settings }
+    { id: 'documents',     label: 'Documents',    icon: BoIcon.doc },
+    { id: 'finance',       label: 'Finance',      icon: BoIcon.finance },
+    { id: 'communication', label: 'Messages',     icon: BoIcon.comm,      badgeKey: 'unread' },
+    { id: 'settings',      label: 'Settings',     icon: BoIcon.settings }
   ]}
 ];
 
@@ -75,6 +70,31 @@ const COUNTRIES = [
   { id: 'fr',  label: '🇫🇷 France' },
   { id: 'nl',  label: '🇳🇱 Netherlands' }
 ];
+
+const STEP_LABELS = {
+  'interested':            'Intérêt exprimé',
+  'consultant-review':     'En revue consultant',
+  'first-contact-planned': '1er contact planifié',
+  'first-contact-done':    '1er contact effectué',
+  'financing-precheck':    'Pré-check financement',
+  'location-validation':   'Validation local',
+  'business-plan':         'Business plan',
+  'committee':             'Comité de validation',
+  'contract-prep':         'Préparation contrat',
+  'training-planning':     'Formation',
+  'opening-planning':      'Planification ouverture',
+};
+const STEP_WEIGHT = Object.fromEntries(Object.keys(STEP_LABELS).map((k, i) => [k, i]));
+function stepTone(step) {
+  const w = STEP_WEIGHT[step] ?? 0;
+  return w >= 7 ? 'success' : w >= 4 ? 'info' : 'neutral';
+}
+function addBusinessDays(days) {
+  const d = new Date();
+  let added = 0;
+  while (added < days) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) added++; }
+  return d.toLocaleDateString('fr-BE', { day: 'numeric', month: 'long' });
+}
 
 // ====================================================================
 // MAIN SHELL
@@ -215,24 +235,18 @@ function BoMain({ currentUser, onLogout }) {
         {/* CONTENT */}
         <div className="bo-content">
           {view === 'dashboard'     && <BoDashboard ctx={ctx} />}
-          {view === 'brands'        && <BoBrands ctx={ctx} />}
-          {view === 'candidates'    && <BoCandidates ctx={ctx} />}
-          {view === 'investors'     && <BoInvestors ctx={ctx} />}
-          {view === 'developers'    && <BoDevelopers ctx={ctx} />}
-          {view === 'consultants'   && <BoConsultants ctx={ctx} />}
-          {view === 'franchisees'   && <BoFranchisees ctx={ctx} />}
-          {view === 'shops'         && <BoShops ctx={ctx} />}
           {view === 'opportunities' && <BoOpportunities ctx={ctx} />}
+          {view === 'candidates'    && <BoCandidates ctx={ctx} />}
           {view === 'crm'           && <BoCRM ctx={ctx} />}
+          {view === 'brands'        && <BoBrands ctx={ctx} />}
+          {view === 'shops'         && <BoShops ctx={ctx} />}
+          {view === 'franchisees'   && <BoFranchisees ctx={ctx} />}
+          {view === 'investors'     && <BoInvestors ctx={ctx} />}
+          {view === 'consultants'   && <BoConsultants ctx={ctx} />}
+          {view === 'developers'    && <BoDevelopers ctx={ctx} />}
           {view === 'documents'     && <BoDocuments ctx={ctx} />}
-          {view === 'communication' && <BoCommunication ctx={ctx} />}
-          {view === 'training'      && <BoTraining ctx={ctx} />}
           {view === 'finance'       && <BoFinance ctx={ctx} />}
-          {view === 'website'       && <BoWebsite ctx={ctx} />}
-          {view === 'roles'         && <BoRoles ctx={ctx} />}
-          {view === 'visibility'    && <BoVisibility ctx={ctx} />}
-          {view === 'preview'       && <BoPreview ctx={ctx} />}
-          {view === 'automation'    && <BoAutomation ctx={ctx} />}
+          {view === 'communication' && <BoCommunication ctx={ctx} />}
           {view === 'settings'      && <BoSettings ctx={ctx} />}
         </div>
       </main>
@@ -879,43 +893,8 @@ function BoShops({ ctx }) {
 }
 
 // ====================================================================
-// OPPORTUNITIES
-// ====================================================================
-// ====================================================================
 // OPPORTUNITIES — table + candidates panel + validate flow
 // ====================================================================
-const STEP_LABELS = {
-  'interested':            'Intérêt exprimé',
-  'consultant-review':     'En revue consultant',
-  'first-contact-planned': '1er contact planifié',
-  'first-contact-done':    '1er contact effectué',
-  'financing-precheck':    'Pré-check financement',
-  'location-validation':   'Validation local',
-  'business-plan':         'Business plan',
-  'committee':             'Comité de validation',
-  'contract-prep':         'Préparation contrat',
-  'training-planning':     'Formation',
-  'opening-planning':      'Planification ouverture',
-};
-
-const STEP_WEIGHT = Object.fromEntries(Object.keys(STEP_LABELS).map((k, i) => [k, i]));
-
-function stepTone(step) {
-  const w = STEP_WEIGHT[step] ?? 0;
-  if (w >= 7) return 'success';
-  if (w >= 4) return 'info';
-  return 'neutral';
-}
-
-function addBusinessDays(days) {
-  const d = new Date();
-  let added = 0;
-  while (added < days) {
-    d.setDate(d.getDate() + 1);
-    if (d.getDay() !== 0 && d.getDay() !== 6) added++;
-  }
-  return d.toLocaleDateString('fr-BE', { day: '2-digit', month: 'short', year: 'numeric' });
-}
 
 // Candidates side panel — pure presenter; no modal state lives here.
 // "Valider" delegates up to onRequestValidate(lead) so the parent owns sequencing.
@@ -1406,28 +1385,6 @@ function BoCommunication({ ctx }) {
   />;
 }
 
-function BoTraining({ ctx }) {
-  const rows = [
-    { id: 't1', module: 'Production · pâte & cuisson',  brand: "L'Atelier By", duration: '4 days', steps: 8 },
-    { id: 't2', module: 'Service & relation client',     brand: 'All',           duration: '2 days', steps: 5 },
-    { id: 't3', module: 'P&L & pilotage magasin',        brand: 'All',           duration: '3 days', steps: 7 },
-    { id: 't4', module: 'Concept Couq · couques au beurre', brand: 'Couq',       duration: '5 days', steps: 9 },
-    { id: 't5', module: 'Pizza romaine al taglio',       brand: 'Mania Pizza',   duration: '6 days', steps: 11 }
-  ];
-  return <BoPlaceholder ctx={ctx} eyebrow="Operations · Training" title="Training management"
-    sub="Parcours, modules, certifications et planning."
-    actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-opportunity')}><BoIcon.plus />New module</button>)}
-    columns={[
-      { k: 'module',   l: 'Module', render: (r) => <strong>{r.module}</strong> },
-      { k: 'brand',    l: 'Brand' },
-      { k: 'duration', l: 'Duration' },
-      { k: 'steps',    l: 'Steps', align: 'right' },
-      { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Open →</button> }
-    ]}
-    rows={rows}
-  />;
-}
-
 function BoFinance({ ctx }) {
   const { FG, A } = ctx;
   const tot = A.PROJECTS.reduce((a, p) => a + p.invested, 0) + Object.values(FG.BRAND_PORTFOLIOS).reduce((a, b) => a + b.summary.invested, 0);
@@ -1451,150 +1408,137 @@ function BoFinance({ ctx }) {
   );
 }
 
-function BoWebsite({ ctx }) {
-  return <BoPlaceholder ctx={ctx} eyebrow="Platform · Public website" title="Public website management"
-    sub="Pilotez les landing pages, carrousels, contenus dynamiques, SEO et médias."
-    actions={(<><button className="bo-btn bo-btn--ghost" onClick={() => window.open('landing.html', '_blank')}>Preview</button><button className="bo-btn bo-btn--primary" onClick={() => toast('success', 'Site published successfully.')}>Publish</button></>)}
-    columns={[
-      { k: 'page', l: 'Page', render: (r) => <strong>{r.page}</strong> },
-      { k: 'updated', l: 'Last updated' },
-      { k: 'author',  l: 'Author' },
-      { k: 'status',  l: 'Status', render: (r) => <BoStatus tone={r.status === 'live' ? 'success' : 'warning'}>{r.status}</BoStatus> },
-      { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Edit →</button> }
-    ]}
-    rows={[
-      { id: 'p1', page: 'landing.html · Homepage',           updated: 'Today',     author: 'Sam Verheyden', status: 'live' },
-      { id: 'p2', page: 'ecosystem.html · Ecosystem',         updated: 'Yesterday', author: 'Loïc Verheyden', status: 'live' },
-      { id: 'p3', page: 'login.html · Sign in',               updated: '2 days',    author: 'Sam Verheyden', status: 'live' },
-      { id: 'p4', page: 'opportunity-detail.html · Modal copy', updated: '3 days',  author: 'Sophie Renard',  status: 'draft' },
-      { id: 'p5', page: 'who-are-you.html · Carousel tiles',  updated: '4 days',    author: 'Sam Verheyden', status: 'live' }
-    ]}
-  />;
-}
-
-function BoRoles({ ctx }) {
-  return <BoPlaceholder ctx={ctx} eyebrow="Platform · Roles" title="Roles & permissions"
-    sub="Permissions granulaires par rôle."
-    actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-lead', { type: 'brand' })}><BoIcon.plus />New role</button>)}
-    columns={[
-      { k: 'role', l: 'Role', render: (r) => <strong>{r.role}</strong> },
-      { k: 'members', l: 'Members', align: 'right' },
-      { k: 'scope',   l: 'Scope' },
-      { k: 'perms',   l: 'Permissions' },
-      { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Edit →</button> }
-    ]}
-    rows={[
-      { id: 1, role: 'Super Admin',    members: 2, scope: 'All',          perms: 'Full access' },
-      { id: 2, role: 'Group Admin',    members: 4, scope: 'All',          perms: 'Read + Write all' },
-      { id: 3, role: 'Brand Manager',  members: 6, scope: 'Per brand',    perms: 'Manage brand + team' },
-      { id: 4, role: 'Consultant',     members: 8, scope: 'Per region',   perms: 'Manage leads + candidates' },
-      { id: 5, role: 'Franchisee',     members: 14, scope: 'Per shop',    perms: 'View shop KPI + reports' },
-      { id: 6, role: 'Investor',       members: 180, scope: 'Per portfolio', perms: 'View investments + docs' },
-      { id: 7, role: 'Candidate',      members: 42, scope: 'Self',        perms: 'Onboarding workspace' },
-      { id: 8, role: 'Developer',      members: 6, scope: 'Self',         perms: 'Submit locations' },
-      { id: 9, role: 'Trainer',        members: 3, scope: 'Training',     perms: 'Manage modules + certs' },
-      { id: 10, role: 'Finance',       members: 2, scope: 'Finance',      perms: 'Read all · write finance' },
-      { id: 11, role: 'Legal',         members: 2, scope: 'Legal',        perms: 'Read all · write contracts' }
-    ]}
-  />;
-}
-
-function BoVisibility({ ctx }) {
-  return <BoPlaceholder ctx={ctx} eyebrow="Platform · Visibility" title="Visibility toggles"
-    sub="Chaque donnée : ON/OFF · Public · Internal · Hidden."
-    actions={(<button className="bo-btn bo-btn--ghost" onClick={() => openModal('confirm', { title: 'Reset visibility?', body: 'All visibility toggles will revert to platform defaults.', successMessage: 'Visibility reset to defaults.' })}>Reset to default</button>)}
-    columns={[
-      { k: 'field', l: 'Field', render: (r) => <strong>{r.field}</strong> },
-      { k: 'public',   l: 'Public site',     render: (r) => <BoToggle on={r.public} /> },
-      { k: 'candidate',l: 'Candidate portal',render: (r) => <BoToggle on={r.candidate} /> },
-      { k: 'investor', l: 'Investor portal', render: (r) => <BoToggle on={r.investor} /> },
-      { k: 'consultant',l:'Consultant',      render: (r) => <BoToggle on={r.consultant} /> }
-    ]}
-    rows={[
-      { id: 'royalties',   field: 'Royalties %',           public: false, candidate: false, investor: true,  consultant: true },
-      { id: 'contacts',    field: 'Direct contacts',       public: false, candidate: false, investor: false, consultant: true },
-      { id: 'kpi',         field: 'KPI per shop',          public: false, candidate: true,  investor: true,  consultant: true },
-      { id: 'team',        field: 'Brand team',            public: true,  candidate: true,  investor: true,  consultant: true },
-      { id: 'roi',         field: 'Expected ROI',          public: true,  candidate: true,  investor: true,  consultant: true },
-      { id: 'docs',        field: 'Brand documents',       public: false, candidate: true,  investor: true,  consultant: true },
-      { id: 'gallery',     field: 'Photo gallery',         public: true,  candidate: true,  investor: true,  consultant: true },
-      { id: 'opportunities', field: 'Open opportunities',  public: true,  candidate: true,  investor: true,  consultant: true }
-    ]}
-  />;
-}
-
-function BoToggle({ on }) {
-  return <span className={'bo-toggle' + (on ? ' is-on' : '')}><i></i></span>;
-}
-
-function BoPreview({ ctx }) {
-  return (
-    <>
-      <BoHead eyebrow="Platform · Preview" title="Multi-context preview"
-        sub="Voyez exactement ce que chaque rôle voit."
-      />
-      <div className="bo-preview-grid">
-        {[
-          { id: 'public',    label: 'Public site',     href: 'landing.html',          frame: 'desktop' },
-          { id: 'mobile',    label: 'Mobile · landing', href: 'landing.html',         frame: 'mobile' },
-          { id: 'candidate', label: 'Candidate portal',href: 'candidate.html',        frame: 'desktop' },
-          { id: 'investor',  label: 'Investor portal', href: 'index.html',            frame: 'desktop' }
-        ].map(p => (
-          <article key={p.id} className="bo-preview">
-            <header><strong>{p.label}</strong><a href={p.href} className="bo-btn bo-btn--ghost bo-btn--xs">Open →</a></header>
-            <div className={'bo-preview__frame bo-preview__frame--' + p.frame}>
-              <iframe src={p.href} title={p.label} loading="lazy"></iframe>
-            </div>
-          </article>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function BoAutomation({ ctx }) {
-  return <BoPlaceholder ctx={ctx} eyebrow="Platform · Automation" title="Automation engine"
-    sub="Emails, notifications, lead assignment, reminders, scoring, status updates."
-    actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('confirm', { title: 'Create new automation?', body: 'Open the rule builder to define a trigger and an action.', confirmLabel: 'Open builder', successMessage: 'Rule builder opened.' })}><BoIcon.plus />New rule</button>)}
-    columns={[
-      { k: 'name', l: 'Rule', render: (r) => <strong>{r.name}</strong> },
-      { k: 'trigger', l: 'Trigger' },
-      { k: 'action', l: 'Action' },
-      { k: 'runs', l: 'Runs last 30d', align: 'right' },
-      { k: 'status', l: 'Status', render: (r) => <BoToggle on={r.status} /> }
-    ]}
-    rows={[
-      { id: 1, name: 'Auto-assign new candidate to consultant by region', trigger: 'Lead created',          action: 'Assign consultant', runs: 42, status: true },
-      { id: 2, name: 'Email "Document expired" reminder',                 trigger: '14 days before expiry', action: 'Send email',        runs: 18, status: true },
-      { id: 3, name: 'Auto-score lead by capital × experience',           trigger: 'Profile updated',       action: 'Update score',      runs: 64, status: true },
-      { id: 4, name: 'Block workflow if no opportunity validated',        trigger: 'Workflow start',        action: 'Block + notify',    runs: 7,  status: true },
-      { id: 5, name: 'Weekly digest to brand managers',                   trigger: 'Monday 09:00',          action: 'Send email',        runs: 4,  status: true },
-      { id: 6, name: 'Alert if closing < 14 days unfunded',               trigger: 'Closing date approaches', action: 'Slack + email',  runs: 3,  status: false }
-    ]}
-  />;
-}
 
 function BoSettings({ ctx }) {
+  const { FG } = ctx;
+  const [tab, setTab] = bState('workspace');
+  const tabs = [
+    { id: 'workspace',  label: 'Workspace' },
+    { id: 'roles',      label: 'Roles' },
+    { id: 'visibility', label: 'Visibility' },
+    { id: 'automation', label: 'Automation' },
+    { id: 'website',    label: 'Website' },
+  ];
   return (
     <>
       <BoHead eyebrow="Platform · Settings" title="Settings"
-        sub="Configuration globale du SaaS."
+        sub="Workspace, roles, visibility, automation and public site."
       />
-      <div className="bo-grid">
-        {[
-          { title: 'Workspace',    items: ['Group name', 'Logo', 'Default language', 'Default currency', 'Time zone'] },
-          { title: 'Localization', items: ['Languages: FR · NL · EN', 'Active countries: BE · FR · NL', 'Date format', 'Number format'] },
-          { title: 'Billing & plan', items: ['Plan: SaaS Pro', 'Seats: 24 / 30', 'Renewal: 12 May 2027', 'Invoices archive'] },
-          { title: 'Integrations', items: ['DocuSign', 'BNP Paribas Fortis (IBAN)', 'SendGrid', 'Slack', 'Google Workspace', 'Stripe'] },
-          { title: 'Audit log',    items: ['Last 90 days', 'Export CSV', 'Retention 24 months'] },
-          { title: 'Data', items: ['Backups: daily', 'Export workspace', 'Delete workspace'] }
-        ].map((c, i) => (
-          <article key={i} className="bo-card">
-            <header className="bo-card__head"><h2 className="bo-card__title">{c.title}</h2></header>
-            <ul className="bo-settings-list">{c.items.map((it, j) => <li key={j}>{it}</li>)}</ul>
-          </article>
+      <div className="bo-filter-toggle" style={{ margin: '0 0 24px' }}>
+        {tabs.map(t => (
+          <button key={t.id}
+            className={'bo-filter-toggle__btn' + (tab === t.id ? ' is-active' : '')}
+            onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
+
+      {tab === 'workspace' && (
+        <div className="bo-grid">
+          {[
+            { title: 'Workspace',    items: ['Group name', 'Logo', 'Default language', 'Default currency', 'Time zone'] },
+            { title: 'Localization', items: ['Languages: FR · NL · EN', 'Active countries: BE · FR · NL', 'Date format', 'Number format'] },
+            { title: 'Billing & plan', items: ['Plan: SaaS Pro', 'Seats: 24 / 30', 'Renewal: 12 May 2027', 'Invoices archive'] },
+            { title: 'Integrations', items: ['DocuSign', 'BNP Paribas Fortis (IBAN)', 'SendGrid', 'Slack', 'Google Workspace', 'Stripe'] },
+            { title: 'Audit log',    items: ['Last 90 days', 'Export CSV', 'Retention 24 months'] },
+            { title: 'Data',         items: ['Backups: daily', 'Export workspace', 'Delete workspace'] }
+          ].map((c, i) => (
+            <article key={i} className="bo-card">
+              <header className="bo-card__head"><h2 className="bo-card__title">{c.title}</h2></header>
+              <ul className="bo-settings-list">{c.items.map((it, j) => <li key={j}>{it}</li>)}</ul>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {tab === 'roles' && (
+        <BoTable
+          columns={[
+            { k: 'role',    l: 'Role',    render: (r) => <strong>{r.role}</strong> },
+            { k: 'members', l: 'Members', align: 'right' },
+            { k: 'scope',   l: 'Scope' },
+            { k: 'perms',   l: 'Permissions' },
+            { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Edit →</button> }
+          ]}
+          rows={[
+            { id: 1, role: 'Super Admin',   members: 2,   scope: 'All',           perms: 'Full access' },
+            { id: 2, role: 'Group Admin',   members: 4,   scope: 'All',           perms: 'Read + Write all' },
+            { id: 3, role: 'Brand Manager', members: 6,   scope: 'Per brand',     perms: 'Manage brand + team' },
+            { id: 4, role: 'Consultant',    members: 8,   scope: 'Per region',    perms: 'Manage leads + candidates' },
+            { id: 5, role: 'Franchisee',    members: 14,  scope: 'Per shop',      perms: 'View shop KPI + reports' },
+            { id: 6, role: 'Investor',      members: 180, scope: 'Per portfolio', perms: 'View investments + docs' },
+            { id: 7, role: 'Candidate',     members: 42,  scope: 'Self',          perms: 'Onboarding workspace' },
+            { id: 8, role: 'Developer',     members: 6,   scope: 'Self',          perms: 'Submit locations' },
+            { id: 9, role: 'Trainer',       members: 3,   scope: 'Training',      perms: 'Manage modules + certs' },
+            { id: 10, role: 'Finance',      members: 2,   scope: 'Finance',       perms: 'Read all · write finance' },
+            { id: 11, role: 'Legal',        members: 2,   scope: 'Legal',         perms: 'Read all · write contracts' }
+          ]}
+        />
+      )}
+
+      {tab === 'visibility' && (
+        <BoTable
+          columns={[
+            { k: 'field',      l: 'Field',            render: (r) => <strong>{r.field}</strong> },
+            { k: 'public',     l: 'Public site',      render: (r) => <BoToggle on={r.public} /> },
+            { k: 'candidate',  l: 'Candidate portal', render: (r) => <BoToggle on={r.candidate} /> },
+            { k: 'investor',   l: 'Investor portal',  render: (r) => <BoToggle on={r.investor} /> },
+            { k: 'consultant', l: 'Consultant',        render: (r) => <BoToggle on={r.consultant} /> }
+          ]}
+          rows={[
+            { id: 'royalties',    field: 'Royalties %',        public: false, candidate: false, investor: true,  consultant: true },
+            { id: 'contacts',     field: 'Direct contacts',    public: false, candidate: false, investor: false, consultant: true },
+            { id: 'kpi',          field: 'KPI per shop',       public: false, candidate: true,  investor: true,  consultant: true },
+            { id: 'team',         field: 'Brand team',         public: true,  candidate: true,  investor: true,  consultant: true },
+            { id: 'roi',          field: 'Expected ROI',       public: true,  candidate: true,  investor: true,  consultant: true },
+            { id: 'docs',         field: 'Brand documents',    public: false, candidate: true,  investor: true,  consultant: true },
+            { id: 'gallery',      field: 'Photo gallery',      public: true,  candidate: true,  investor: true,  consultant: true },
+            { id: 'opportunities', field: 'Open opportunities', public: true, candidate: true,  investor: true,  consultant: true }
+          ]}
+        />
+      )}
+
+      {tab === 'automation' && (
+        <BoTable
+          columns={[
+            { k: 'name',    l: 'Rule',          render: (r) => <strong>{r.name}</strong> },
+            { k: 'trigger', l: 'Trigger' },
+            { k: 'action',  l: 'Action' },
+            { k: 'runs',    l: 'Runs / 30d', align: 'right' },
+            { k: 'status',  l: 'Active', render: (r) => <BoToggle on={r.status} /> }
+          ]}
+          rows={[
+            { id: 1, name: 'Auto-assign candidate to consultant by region', trigger: 'Lead created',           action: 'Assign consultant', runs: 42, status: true },
+            { id: 2, name: 'Email "Document expired" reminder',             trigger: '14 days before expiry',  action: 'Send email',        runs: 18, status: true },
+            { id: 3, name: 'Auto-score lead by capital × experience',       trigger: 'Profile updated',        action: 'Update score',      runs: 64, status: true },
+            { id: 4, name: 'Block workflow if no opportunity validated',    trigger: 'Workflow start',         action: 'Block + notify',    runs: 7,  status: true },
+            { id: 5, name: 'Weekly digest to brand managers',               trigger: 'Monday 09:00',           action: 'Send email',        runs: 4,  status: true },
+            { id: 6, name: 'Alert if closing < 14 days unfunded',           trigger: 'Closing date approaches', action: 'Slack + email',   runs: 3,  status: false }
+          ]}
+        />
+      )}
+
+      {tab === 'website' && <>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+          <button className="bo-btn bo-btn--ghost" onClick={() => window.open('landing.html', '_blank')}>Preview site →</button>
+          <button className="bo-btn bo-btn--primary" onClick={() => toast('success', 'Site published.')}>Publish</button>
+        </div>
+        <BoTable
+          columns={[
+            { k: 'page',    l: 'Page',    render: (r) => <strong>{r.page}</strong> },
+            { k: 'updated', l: 'Updated' },
+            { k: 'author',  l: 'Author' },
+            { k: 'status',  l: 'Status',  render: (r) => <BoStatus tone={r.status === 'live' ? 'success' : 'warning'}>{r.status}</BoStatus> },
+            { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Edit →</button> }
+          ]}
+          rows={[
+            { id: 'p1', page: 'landing.html · Homepage',              updated: 'Today',     author: 'Sam Verheyden',  status: 'live' },
+            { id: 'p2', page: 'ecosystem.html · Ecosystem',            updated: 'Yesterday', author: 'Loïc Verheyden', status: 'live' },
+            { id: 'p3', page: 'login.html · Sign in',                  updated: '2 days',    author: 'Sam Verheyden',  status: 'live' },
+            { id: 'p4', page: 'opportunity-detail.html · Modal copy',  updated: '3 days',    author: 'Sophie Renard',  status: 'draft' },
+            { id: 'p5', page: 'who-are-you.html · Carousel tiles',     updated: '4 days',    author: 'Sam Verheyden',  status: 'live' }
+          ]}
+        />
+      </>}
     </>
   );
 }
