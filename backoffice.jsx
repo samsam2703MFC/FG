@@ -616,13 +616,19 @@ function BoCandidates({ ctx }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ candidateId: lead.id }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(8000),
       });
-      if (res.ok) {
-        const json = await res.json();
-        onboardingId = json?.data?.onboardingRecord?.id || null;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast('error', err.error || `Validation failed (${res.status})`);
+        return;
       }
-    } catch (_) { /* demo: proceed regardless */ }
+      const json = await res.json();
+      onboardingId = json?.data?.onboardingRecord?.id || null;
+    } catch (err) {
+      toast('error', err.name === 'TimeoutError' ? 'Request timed out — please retry.' : 'Network error — validation not saved.');
+      return;
+    }
 
     setClosedMap(m => ({
       ...m,
@@ -715,43 +721,69 @@ function BoCandidates({ ctx }) {
 // INVESTORS
 // ====================================================================
 function BoInvestors({ ctx }) {
-  const { FG, A } = ctx;
-  const totalInvested = A.PROJECTS.reduce((a, p) => a + p.invested, 0) +
-    Object.values(FG.BRAND_PORTFOLIOS).reduce((a, b) => a + b.summary.invested, 0);
+  const { FG } = ctx;
+  const [investors, setInvestors] = bState([FG.INVESTOR]);
+  const [loading, setLoading] = bState(true);
+
+  bEffect(() => {
+    const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
+    fetch('/api/investors', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.data) setInvestors(j.data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Compute KYC counts from real documents
+  const kycDocs   = FG.FG_DOCS.filter(d => d.type === 'kyc' || d.type === 'identity' || d.type === 'contract');
+  const kycCounts = {
+    validated: kycDocs.filter(d => d.status === 'validated' || d.status === 'signed').length,
+    pending:   kycDocs.filter(d => d.status === 'pending' || d.status === 'review').length,
+    expired:   kycDocs.filter(d => d.status === 'expired').length,
+    missing:   kycDocs.filter(d => d.status === 'missing').length
+  };
+
   return (
     <>
       <BoHead eyebrow="People · Investors" title="Investor management"
         sub="Profils, budgets, ROI recherchés et investissements actifs."
         actions={(<>
-          <button className="bo-btn bo-btn--ghost" onClick={() => openModal('detail', { title: 'KYC overview', eyebrow: 'Compliance', rows: [{ l: 'Validated', v: '6' }, { l: 'Pending', v: '1' }, { l: 'Expired', v: '1' }, { l: 'Missing', v: '1' }] })}>KYC overview</button>
+          <button className="bo-btn bo-btn--ghost" onClick={() => openModal('detail', { title: 'KYC overview', eyebrow: 'Compliance', rows: [
+            { l: 'Validated', v: String(kycCounts.validated) },
+            { l: 'Pending',   v: String(kycCounts.pending) },
+            { l: 'Expired',   v: String(kycCounts.expired) },
+            { l: 'Missing',   v: String(kycCounts.missing) }
+          ] })}>KYC overview</button>
           <button className="bo-btn bo-btn--primary" onClick={() => openModal('new-lead', { type: 'investor' })}><BoIcon.plus />New investor</button>
         </>)}
       />
       <BoFilters filters={[
         { label: 'Search', kind: 'search', placeholder: 'Investor name…' },
-        { label: 'Tier', kind: 'select', options: ['All', 'Privilège', 'Standard', 'Pilot'] },
-        { label: 'Region', kind: 'select', options: ['All', 'Belgium', 'France', 'NL'] }
+        { label: 'Tier', kind: 'select', options: ['All', 'Privilège', 'Premium', 'Standard', 'Pilot'] },
+        { label: 'Status', kind: 'select', options: ['All', 'funded', 'signed', 'prospect'] }
       ]}/>
-      <BoTable
-        columns={[
-          { k: 'name', l: 'Investor', render: () => (
-            <span className="bo-cell-brand">
-              <span className="bo-cell-brand__mark" style={{ background: 'var(--brand-primary)' }}>CV</span>
-              <span>
-                <p className="bo-cell-brand__name">Claire Vermeulen</p>
-                <p className="bo-cell-brand__kind">{FG.INVESTOR.email}</p>
+      {loading && <p style={{ padding: 24, color: 'rgba(14,27,40,.4)' }}>Loading investors…</p>}
+      {!loading && (
+        <BoTable
+          columns={[
+            { k: 'name', l: 'Investor', render: (r) => (
+              <span className="bo-cell-brand">
+                <span className="bo-cell-brand__mark" style={{ background: 'var(--brand-primary)' }}>{r.initials || r.name?.[0]}</span>
+                <span>
+                  <p className="bo-cell-brand__name">{r.name}</p>
+                  <p className="bo-cell-brand__kind">{r.email}</p>
+                </span>
               </span>
-            </span>
-          )},
-          { k: 'tier',     l: 'Tier',           render: () => <BoStatus tone="success">{FG.INVESTOR.tier}</BoStatus> },
-          { k: 'invested', l: 'Capital placé',   render: () => FG.fmtEur(totalInvested) },
-          { k: 'projects', l: 'Projets',         render: () => A.PROJECTS.length + Object.values(FG.BRAND_PORTFOLIOS).reduce((a, b) => a + b.shops.length, 0) },
-          { k: 'tri',      l: 'TRI moyen',       render: () => '8,4 %' },
-          { k: 'since',    l: 'Since',           render: () => FG.INVESTOR.since },
-          { k: 'go',       l: '', align: 'right', render: (r) => <a className="bo-btn bo-btn--ghost bo-btn--xs" href={`investor-profile.html?investor=${r.id}`}>Open →</a> }
-        ]}
-        rows={[FG.INVESTOR]}
-      />
+            )},
+            { k: 'tier',      l: 'Tier',     render: (r) => <BoStatus tone={r.tier === 'Privilège' || r.tier === 'Premium' ? 'success' : 'info'}>{r.tier || '—'}</BoStatus> },
+            { k: 'invested',  l: 'Invested',  render: (r) => FG.fmtEur(r.totalInvested || 0) },
+            { k: 'brands',    l: 'Brands',    render: (r) => (r.brands || []).length },
+            { k: 'since',     l: 'Since',     render: (r) => r.since || '—' },
+            { k: 'go', l: '', align: 'right', render: (r) => <a className="bo-btn bo-btn--ghost bo-btn--xs" href={`investor-profile.html?investor=${r.id}`}>Open →</a> }
+          ]}
+          rows={investors}
+        />
+      )}
     </>
   );
 }
@@ -760,33 +792,40 @@ function BoInvestors({ ctx }) {
 // DEVELOPERS (real estate)
 // ====================================================================
 function BoDevelopers({ ctx }) {
-  const rows = [
-    { id: 'd1', name: 'Béatrice Hennion', company: 'BH Immobilier', city: 'Bruxelles · Châtelain', surface: '120 m²', rent: '4 200 €/m', status: 'in-review' },
-    { id: 'd2', name: 'Marc Vermast',     company: 'V-Real Estate', city: 'Antwerpen · Zuid',      surface: '95 m²',  rent: '3 600 €/m', status: 'matched' },
-    { id: 'd3', name: 'Pierre Lemaire',   company: 'Independent',   city: 'Lille (FR)',            surface: '160 m²', rent: '5 800 €/m', status: 'new' }
-  ];
+  const { FG } = ctx;
+  const devs = FG.DEVELOPERS || [];
   return (
     <>
       <BoHead eyebrow="People · Developers" title="Real estate developers"
         sub="Cellules commerciales et projets immobiliers proposés au réseau."
-        actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-lead', { type: 'developer' })}><BoIcon.plus />New location</button>)}
+        actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-lead', { type: 'developer' })}><BoIcon.plus />New developer</button>)}
       />
       <BoFilters filters={[
         { label: 'Search', kind: 'search', placeholder: 'Developer or city…' },
-        { label: 'Surface', kind: 'select', options: ['Any', '< 80 m²', '80–120 m²', '120 m²+'] },
-        { label: 'Status', kind: 'select', options: ['All', 'New', 'In review', 'Matched', 'Closed'] }
+        { label: 'Region', kind: 'select', options: ['All', ...FG.REGIONS.map(r => r.label)] },
+        { label: 'Status', kind: 'select', options: ['All', 'pending', 'active', 'inactive', 'archived'] }
       ]}/>
       <BoTable
         columns={[
-          { k: 'developer', l: 'Developer', render: (r) => <span><strong>{r.name}</strong><br /><span style={{ fontSize: 11, color: 'rgba(14,27,40,0.55)' }}>{r.company}</span></span> },
-          { k: 'city',     l: 'Location' },
-          { k: 'surface',  l: 'Surface' },
-          { k: 'rent',     l: 'Estimated rent' },
-          { k: 'status',   l: 'Status', render: (r) => <BoStatus tone={r.status === 'matched' ? 'success' : r.status === 'in-review' ? 'warning' : 'info'}>{r.status}</BoStatus> },
+          { k: 'developer', l: 'Developer', render: (r) => (
+            <span className="bo-cell-brand">
+              <span className="bo-cell-brand__mark" style={{ background: 'var(--brand-primary)' }}>
+                {(r.name || '?')[0]}
+              </span>
+              <span>
+                <p className="bo-cell-brand__name">{r.name}</p>
+                <p className="bo-cell-brand__kind">{r.contactName} · {r.email}</p>
+              </span>
+            </span>
+          )},
+          { k: 'regions', l: 'Regions', render: (r) => (r.regions || []).map(rid => FG.REGIONS.find(x => x.id === rid)?.label || rid).join(', ') || '—' },
+          { k: 'locations', l: 'Locations', render: (r) => `${(r.locations || []).length} loc.`, align: 'right' },
+          { k: 'status', l: 'Status', render: (r) => <BoStatus tone={r.status === 'active' ? 'success' : r.status === 'pending' ? 'warning' : 'neutral'}>{r.status || 'pending'}</BoStatus> },
           { k: 'go', l: '', align: 'right', render: () => <button className="bo-btn bo-btn--ghost bo-btn--xs">Open →</button> }
         ]}
-        rows={rows}
+        rows={devs}
       />
+      {devs.length === 0 && <p style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(14,27,40,.4)', fontSize: 14 }}>No developers yet — add one above.</p>}
     </>
   );
 }
@@ -805,7 +844,7 @@ function BoConsultants({ ctx }) {
     <>
       <BoHead eyebrow="People · Consultants" title="Consultants & operations"
         sub="Pipelines, scoring et KPI consultants."
-        actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-lead', { type: 'candidate' })}><BoIcon.plus />Add consultant</button>)}
+        actions={(<button className="bo-btn bo-btn--primary" onClick={() => openModal('new-lead', { type: 'consultant' })}><BoIcon.plus />Add consultant</button>)}
       />
       <BoTable
         columns={[
@@ -1149,13 +1188,19 @@ function BoOpportunities({ ctx }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ candidateId: lead.id }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(8000),
       });
-      if (res.ok) {
-        const json = await res.json();
-        onboardingId = json?.data?.onboardingRecord?.id || null;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast('error', err.error || `Validation failed (${res.status})`);
+        return;
       }
-    } catch (_) { /* demo: proceed regardless */ }
+      const json = await res.json();
+      onboardingId = json?.data?.onboardingRecord?.id || null;
+    } catch (err) {
+      toast('error', err.name === 'TimeoutError' ? 'Request timed out — please retry.' : 'Network error — validation not saved.');
+      return;
+    }
 
     setClosedMap(m => ({
       ...m,
@@ -1268,6 +1313,15 @@ function BoOpportunities({ ctx }) {
 
 function BoCRM({ ctx }) {
   const { FG } = ctx;
+  const [crmTasks, setCrmTasks] = bState([]);
+
+  bEffect(() => {
+    const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
+    fetch('/api/backoffice/tasks', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.data) setCrmTasks(j.data); })
+      .catch(() => {});
+  }, []);
   const sources = [
     { id: 'candidate', label: 'Candidate', count: FG.CANDIDATE_LEADS.length },
     { id: 'investor',  label: 'Investor',  count: 0 },
@@ -1327,6 +1381,26 @@ function BoCRM({ ctx }) {
           </div>
         ))}
       </div>
+
+      {/* CRM Tasks — created by validation flow for losing candidates */}
+      {crmTasks.length > 0 && (
+        <>
+          <h3 style={{ margin: '32px 0 12px', fontSize: 14, fontWeight: 600, color: 'rgba(14,27,40,.6)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            Follow-up tasks ({crmTasks.length})
+          </h3>
+          <BoTable
+            columns={[
+              { k: 'type',          l: 'Type',      render: (r) => <strong>{r.type}</strong> },
+              { k: 'candidateName', l: 'Candidate' },
+              { k: 'opportunityId', l: 'Opportunity' },
+              { k: 'assignedTo',    l: 'Assigned to' },
+              { k: 'dueAt',         l: 'Due',        render: (r) => r.dueAt?.slice(0, 10) },
+              { k: 'status',        l: 'Status',     render: (r) => <BoStatus tone={r.status === 'done' ? 'success' : 'warning'}>{r.status}</BoStatus> }
+            ]}
+            rows={crmTasks}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -1666,69 +1740,224 @@ function useFakeSubmit(onDone) {
 
 function ModalNewLead({ ctx, payload, onClose }) {
   const { FG } = ctx;
-  const [type, setType] = bState(payload?.type || 'candidate');
-  const [name, setName] = bState('');
-  const [email, setEmail] = bState('');
-  const [phone, setPhone] = bState('');
-  const [brand, setBrand] = bState(FG.BRANDS[0].id);
-  const [notes, setNotes] = bState('');
-  const [err, setErr] = bState('');
-  const [busy, submit] = useFakeSubmit(() => {
-    toast('success', `${name} added as ${type} lead.`);
-    onClose();
-  });
-  const onSubmit = () => {
-    if (!name || !email) { setErr('Name and email are required.'); toast('error', 'Please fill in the required fields.'); return; }
+  const [type,            setType]            = bState(payload?.type || 'candidate');
+  const [name,            setName]            = bState('');
+  const [contactName,     setContactName]     = bState('');
+  const [email,           setEmail]           = bState('');
+  const [phone,           setPhone]           = bState('');
+  const [brand,           setBrand]           = bState('');
+  const [notes,           setNotes]           = bState('');
+  const [busy,            setBusy]            = bState(false);
+  const [err,             setErr]             = bState('');
+  // Investor-specific
+  const [invType,         setInvType]         = bState('individual');
+  const [invClass,        setInvClass]        = bState('');
+  const [invAmount,       setInvAmount]       = bState('');
+  const [invStatus,       setInvStatus]       = bState('prospect');
+  const [invTier,         setInvTier]         = bState('Pilot');
+  const [fsma,            setFsma]            = bState(false);
+  // Developer-specific
+  const [devRegions,      setDevRegions]      = bState('');
+  const [devType,         setDevType]         = bState('');
+
+  const getToken = () => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } };
+
+  const onSubmit = async () => {
+    if (!name || !email) { setErr('Name and email are required.'); return; }
     setErr('');
-    submit();
+    setBusy(true);
+
+    try {
+      let url, body;
+
+      if (type === 'investor') {
+        url = '/api/investors';
+        body = { name, email, phone: phone || undefined, type: invType, tier: invTier,
+          investmentClass: invClass || undefined, amountCommitted: invAmount ? Number(invAmount) : undefined,
+          status: invStatus, brands: brand ? [brand] : [], fsmaAccepted: fsma, notes: notes || undefined };
+      } else if (type === 'developer') {
+        url = '/api/developers';
+        body = { name, contactName: contactName || name, email, phone: phone || undefined,
+          type: devType || undefined,
+          regions: devRegions ? devRegions.split(',').map(s => s.trim()).filter(Boolean) : [],
+          notes: notes || undefined };
+      } else {
+        url = '/api/candidates';
+        body = { firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') || '—',
+          email, phone: phone || undefined, brandPreference: brand ? [brand] : [], generalStatus: 'En pré-analyse' };
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8000)
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error || `Error ${res.status}`); setBusy(false); return; }
+
+      toast('success', `${name} added as ${type}.`);
+      onClose();
+    } catch (e) {
+      setErr(e.name === 'TimeoutError' ? 'Request timed out.' : 'Network error.');
+      setBusy(false);
+    }
   };
+
   return (
-    <BoModal open title="New lead" eyebrow="CRM" sub="Create a new lead and route it to the right consultant."
-      onClose={onClose} onSubmit={onSubmit} submitLabel="Create lead" busy={busy}>
+    <BoModal open title="New lead" eyebrow="CRM" sub="Create a new profile and route it to the right consultant."
+      onClose={onClose} onSubmit={onSubmit} submitLabel={`Create ${type}`} busy={busy}>
+
       <BoField label="Type">
         <div className="bo-segment">
-          {['candidate', 'investor', 'brand', 'developer', 'new-brand'].map(t => (
+          {['candidate', 'investor', 'developer'].map(t => (
             <button key={t} type="button" className={'bo-segment__opt' + (type === t ? ' is-active' : '')} onClick={() => setType(t)}>{t}</button>
           ))}
         </div>
       </BoField>
+
+      {/* Developer: company name + contact person */}
+      {type === 'developer' ? (
+        <div className="bo-form-row">
+          <BoField label="Company name *"><input value={name} onChange={e => setName(e.target.value)} placeholder="BH Immobilier" /></BoField>
+          <BoField label="Contact person *"><input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Jean Dupont" /></BoField>
+        </div>
+      ) : (
+        <BoField label="Full name *"><input value={name} onChange={e => setName(e.target.value)} /></BoField>
+      )}
+
       <div className="bo-form-row">
-        <BoField label="Full name *"><input value={name} onChange={e => setName(e.target.value)} required /></BoField>
-        <BoField label="Email *"><input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></BoField>
-      </div>
-      <div className="bo-form-row">
+        <BoField label="Email *"><input type="email" value={email} onChange={e => setEmail(e.target.value)} /></BoField>
         <BoField label="Phone"><input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></BoField>
-        <BoField label="Linked brand">
+      </div>
+
+      {/* Investor-specific fields */}
+      {type === 'investor' && (<>
+        <div className="bo-form-row">
+          <BoField label="Type">
+            <select value={invType} onChange={e => setInvType(e.target.value)}>
+              <option value="individual">Individual</option>
+              <option value="entity">Legal entity</option>
+            </select>
+          </BoField>
+          <BoField label="Investment class">
+            <select value={invClass} onChange={e => setInvClass(e.target.value)}>
+              <option value="">— None —</option>
+              <option value="A">Class A — Founding</option>
+              <option value="B">Class B — Strategic</option>
+              <option value="C">Class C — Standard</option>
+              <option value="D">Class D — Observer</option>
+            </select>
+          </BoField>
+        </div>
+        <div className="bo-form-row">
+          <BoField label="Amount committed (€)">
+            <input type="number" value={invAmount} onChange={e => setInvAmount(e.target.value)} placeholder="25 000" />
+          </BoField>
+          <BoField label="Tier">
+            <select value={invTier} onChange={e => setInvTier(e.target.value)}>
+              <option value="Pilot">Pilot</option>
+              <option value="Standard">Standard</option>
+              <option value="Privilège">Privilège</option>
+              <option value="Premium">Premium</option>
+            </select>
+          </BoField>
+        </div>
+        <div className="bo-form-row">
+          <BoField label="Status">
+            <select value={invStatus} onChange={e => setInvStatus(e.target.value)}>
+              <option value="prospect">Prospect</option>
+              <option value="signed">Signed</option>
+              <option value="funded">Funded</option>
+            </select>
+          </BoField>
+          <BoField label="Linked brand">
+            <select value={brand} onChange={e => setBrand(e.target.value)}>
+              <option value="">— Any —</option>
+              {FG.BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </BoField>
+        </div>
+        <BoField label="FSMA disclaimer">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 400 }}>
+            <input type="checkbox" checked={fsma} onChange={e => setFsma(e.target.checked)} />
+            Investor has read and accepted the FSMA information document
+          </label>
+        </BoField>
+      </>)}
+
+      {/* Developer-specific fields */}
+      {type === 'developer' && (<>
+        <div className="bo-form-row">
+          <BoField label="Developer type">
+            <select value={devType} onChange={e => setDevType(e.target.value)}>
+              <option value="">— Select —</option>
+              <option value="Propriétaire individuel">Propriétaire individuel</option>
+              <option value="Société immobilière">Société immobilière</option>
+              <option value="Agent immobilier">Agent immobilier</option>
+              <option value="Promoteur">Promoteur</option>
+            </select>
+          </BoField>
+          <BoField label="Regions (comma-separated)" hint="e.g. bxl, wal">
+            <input value={devRegions} onChange={e => setDevRegions(e.target.value)} placeholder="bxl, wal" />
+          </BoField>
+        </div>
+      </>)}
+
+      {/* Candidate-specific */}
+      {type === 'candidate' && (
+        <BoField label="Preferred brand">
           <select value={brand} onChange={e => setBrand(e.target.value)}>
             <option value="">— Any —</option>
             {FG.BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </BoField>
-      </div>
-      <BoField label="Notes"><textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)}></textarea></BoField>
+      )}
+
+      <BoField label="Notes"><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></BoField>
       {err && <p className="bo-form-error">{err}</p>}
     </BoModal>
   );
 }
 
 function ModalNewBrand({ ctx, onClose }) {
-  const [name, setName] = bState('');
-  const [kind, setKind] = bState('Boulangerie · Pâtisserie');
-  const [city, setCity] = bState('');
-  const [busy, submit] = useFakeSubmit(() => { toast('success', `${name} added as new brand.`); onClose(); });
+  const [name,        setName]        = bState('');
+  const [tagline,     setTagline]     = bState('');
+  const [kind,        setKind]        = bState('');
+  const [city,        setCity]        = bState('');
+  const [yearFounded, setYearFounded] = bState(String(new Date().getFullYear()));
+  const [busy,        setBusy]        = bState(false);
+  const [err,         setErr]         = bState('');
+
+  const onSubmit = async () => {
+    if (!name.trim()) { toast('error', 'Brand name is required.'); return; }
+    setBusy(true); setErr('');
+    try {
+      const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
+      const res = await fetch('/api/brands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: name.trim(), tagline, kind, city, yearFounded: Number(yearFounded) || new Date().getFullYear() })
+      });
+      const json = await res.json();
+      if (!res.ok) { setErr(json.error || json.message || 'Failed to create brand.'); setBusy(false); return; }
+      toast('success', `${name.trim()} added as new brand.`);
+      onClose();
+    } catch (_) { setErr('Network error — please retry.'); setBusy(false); }
+  };
+
   return (
-    <BoModal open title="New brand" eyebrow="Brand management" onClose={onClose} onSubmit={() => {
-      if (!name) { toast('error', 'Brand name is required.'); return; }
-      submit();
-    }} submitLabel="Create brand" busy={busy}>
+    <BoModal open title="New brand" eyebrow="Brand management" onClose={onClose} onSubmit={onSubmit} submitLabel="Create brand" busy={busy}>
+      {err && <p style={{color:'var(--danger,#c0392b)',marginBottom:8,fontSize:13}}>{err}</p>}
       <BoField label="Brand name *"><input value={name} onChange={e => setName(e.target.value)} required /></BoField>
       <div className="bo-form-row">
-        <BoField label="Sector"><input value={kind} onChange={e => setKind(e.target.value)} /></BoField>
-        <BoField label="HQ city"><input value={city} onChange={e => setCity(e.target.value)} /></BoField>
+        <BoField label="Tagline"><input value={tagline} onChange={e => setTagline(e.target.value)} placeholder="Boulangerie de quartier · Belgique" /></BoField>
+        <BoField label="Sector"><input value={kind} onChange={e => setKind(e.target.value)} placeholder="Boulangerie · Pâtisserie" /></BoField>
       </div>
-      <BoField label="Initial visibility" hint="Public visibility can be configured later under Visibility settings.">
-        <select defaultValue="internal"><option value="internal">Internal only</option><option value="public">Public</option><option value="hidden">Hidden</option></select>
-      </BoField>
+      <div className="bo-form-row">
+        <BoField label="HQ city"><input value={city} onChange={e => setCity(e.target.value)} /></BoField>
+        <BoField label="Year founded"><input type="number" value={yearFounded} onChange={e => setYearFounded(e.target.value)} /></BoField>
+      </div>
     </BoModal>
   );
 }
@@ -1759,51 +1988,99 @@ function ModalNewOpportunity({ ctx, onClose }) {
   const DEVS = FG.DEVELOPERS || [];
 
   const [brand,     setBrand]     = bState(FG.BRANDS[0].id);
+  const [oppName,   setOppName]   = bState('');
+  const [city,      setCity]      = bState('');
   const [devId,     setDevId]     = bState('');
   const [locId,     setLocId]     = bState('');
   const [budget,    setBudget]    = bState('');
   const [ticketMin, setTicketMin] = bState('');
   const [ticketMax, setTicketMax] = bState('');
   const [roiTarget, setRoiTarget] = bState('');
-  const [status,    setStatus]    = bState('open');
+  const [status,    setStatus]    = bState('En recherche candidat');
+  const [busy,      setBusy]      = bState(false);
+  const [err,       setErr]       = bState('');
 
   const dev       = DEVS.find(d => d.id === devId) || null;
   const locations = dev ? dev.locations.filter(l => l.status === 'available' || l.status === 'under-review') : [];
   const loc       = locations.find(l => l.id === locId) || null;
 
-  // When developer changes, reset location
   const handleDevChange = (id) => { setDevId(id); setLocId(''); };
+  const handleLocChange = (id) => {
+    setLocId(id);
+    const l = locations.find(x => x.id === id);
+    if (l) {
+      if (!city) setCity(l.city || '');
+      if (!oppName) setOppName(`${FG.brandById(brand)?.name || ''} ${l.city || ''}`.trim());
+    }
+  };
 
-  const canSubmit = brand && devId && locId;
-  const [busy, submit] = useFakeSubmit(() => {
-    toast('success', `Opportunity created · ${FG.brandById(brand)?.name} @ ${loc?.city}`);
-    onClose();
-  });
+  const onSubmit = async () => {
+    if (!brand)          { toast('error', 'Please select a brand.');          return; }
+    if (!oppName.trim()) { toast('error', 'Opportunity name is required.');   return; }
+    if (!city.trim())    { toast('error', 'City is required.');                return; }
+    setBusy(true); setErr('');
+    try {
+      const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
+      const res = await fetch('/api/opportunities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          brand, name: oppName.trim(), city: city.trim(), status,
+          developerId: devId || null, locationId: locId || null,
+          budget:    budget    ? Number(budget)    : null,
+          ticketMin: ticketMin ? Number(ticketMin) : null,
+          ticketMax: ticketMax ? Number(ticketMax) : null,
+          roiTarget: roiTarget ? Number(roiTarget) : null,
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) { setErr(json.error || json.message || 'Failed to create opportunity.'); setBusy(false); return; }
+      toast('success', `Opportunity created · ${json.data?.name}`);
+      onClose();
+    } catch (_) { setErr('Network error — please retry.'); setBusy(false); }
+  };
 
   return (
     <BoModal open title="New opportunity" eyebrow="Opportunities" onClose={onClose}
-      onSubmit={() => canSubmit ? submit() : toast('error', 'Select a brand and a developer location.')}
-      submitLabel="Create opportunity" busy={busy}>
+      onSubmit={onSubmit} submitLabel="Create opportunity" busy={busy}>
 
-      {/* Row 1: Brand + Developer */}
+      {err && <p style={{color:'var(--danger,#c0392b)',marginBottom:8,fontSize:13}}>{err}</p>}
+
+      <BoField label="Brand *">
+        <select value={brand} onChange={e => { setBrand(e.target.value); setOppName(''); }}>
+          {FG.BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      </BoField>
+
       <div className="bo-form-row">
-        <BoField label="Brand *">
-          <select value={brand} onChange={e => setBrand(e.target.value)}>
-            {FG.BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        <BoField label="Opportunity name *">
+          <input value={oppName} onChange={e => setOppName(e.target.value)} placeholder="L'Atelier By Saint-Gilles" />
+        </BoField>
+        <BoField label="City *">
+          <input value={city} onChange={e => setCity(e.target.value)} placeholder="Bruxelles" />
+        </BoField>
+      </div>
+
+      <div className="bo-form-row">
+        <BoField label="Developer">
+          <select value={devId} onChange={e => handleDevChange(e.target.value)}>
+            <option value="">— No developer —</option>
+            {DEVS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </BoField>
-        <BoField label="Developer *">
-          <select value={devId} onChange={e => handleDevChange(e.target.value)}>
-            <option value="">— Select developer —</option>
-            {DEVS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        <BoField label="Status">
+          <select value={status} onChange={e => setStatus(e.target.value)}>
+            <option value="En recherche candidat">En recherche candidat</option>
+            <option value="Pré-lancement">Pré-lancement</option>
+            <option value="Closing imminent">Closing imminent</option>
+            <option value="Co-investissement ouvert">Co-investissement ouvert</option>
           </select>
         </BoField>
       </div>
 
-      {/* Location dropdown — only shown once a developer is selected */}
       {devId && (
-        <BoField label="Location *">
-          <select value={locId} onChange={e => setLocId(e.target.value)}>
+        <BoField label="Location">
+          <select value={locId} onChange={e => handleLocChange(e.target.value)}>
             <option value="">— Select location —</option>
             {locations.map(l => (
               <option key={l.id} value={l.id}>{l.address} · {l.surface}</option>
@@ -1813,7 +2090,6 @@ function ModalNewOpportunity({ ctx, onClose }) {
         </BoField>
       )}
 
-      {/* Location details card — shown once a location is selected */}
       {loc && (
         <div className="bo-location-card">
           <div className="bo-location-card__row">
@@ -1825,10 +2101,6 @@ function ModalNewOpportunity({ ctx, onClose }) {
             <span>{loc.surface}</span>
           </div>
           <div className="bo-location-card__row">
-            <span className="bo-location-card__label">Type</span>
-            <span>{loc.type}</span>
-          </div>
-          <div className="bo-location-card__row">
             <span className="bo-location-card__label">Available from</span>
             <span>{loc.availability}</span>
           </div>
@@ -1836,12 +2108,6 @@ function ModalNewOpportunity({ ctx, onClose }) {
             <span className="bo-location-card__label">Monthly rent</span>
             <span>€{loc.rent?.toLocaleString()}/month</span>
           </div>
-          {loc.notes && (
-            <div className="bo-location-card__row">
-              <span className="bo-location-card__label">Notes</span>
-              <span className="bo-location-card__note">{loc.notes}</span>
-            </div>
-          )}
           {dev && (
             <div className="bo-location-card__row">
               <span className="bo-location-card__label">Contact</span>
@@ -1851,7 +2117,6 @@ function ModalNewOpportunity({ ctx, onClose }) {
         </div>
       )}
 
-      {/* Financial details */}
       <BoField label="Approximate total budget (€)">
         <input type="number" value={budget} onChange={e => setBudget(e.target.value)} placeholder="180 000" />
       </BoField>
@@ -1863,18 +2128,9 @@ function ModalNewOpportunity({ ctx, onClose }) {
           <input type="number" value={ticketMax} onChange={e => setTicketMax(e.target.value)} placeholder="200 000" />
         </BoField>
       </div>
-      <div className="bo-form-row">
-        <BoField label="ROI target (%)">
-          <input type="number" value={roiTarget} onChange={e => setRoiTarget(e.target.value)} placeholder="8.0" step="0.1" />
-        </BoField>
-        <BoField label="Status">
-          <select value={status} onChange={e => setStatus(e.target.value)}>
-            <option value="open">Open</option>
-            <option value="pre">Pre-launch</option>
-            <option value="closing">Closing imminent</option>
-          </select>
-        </BoField>
-      </div>
+      <BoField label="ROI target (%)">
+        <input type="number" value={roiTarget} onChange={e => setRoiTarget(e.target.value)} placeholder="8.0" step="0.1" />
+      </BoField>
     </BoModal>
   );
 }
