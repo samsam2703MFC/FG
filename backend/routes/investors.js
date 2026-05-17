@@ -248,6 +248,67 @@ router.post(
 );
 
 // ---------------------------------------------------------------------------
+// POST /api/investors
+// ---------------------------------------------------------------------------
+router.post(
+  '/',
+  authorize('admin'),
+  [
+    body('name').isLength({ min: 2, max: 200 }).withMessage('Name required'),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('phone').optional().isString(),
+    body('type').optional().isIn(['individual', 'entity']),
+    body('tier').optional().isIn(['Pilot', 'Standard', 'Privilège', 'Premium']),
+    body('investmentClass').optional().isIn(['A', 'B', 'C', 'D']),
+    body('amountCommitted').optional().isNumeric(),
+    body('status').optional().isIn(['prospect', 'signed', 'funded']),
+    body('brands').optional().isArray(),
+    body('iban').optional().isString(),
+    body('fsmaAccepted').optional().isBoolean(),
+    body('notes').optional().isString().isLength({ max: 2000 })
+  ],
+  (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(422).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: errors.array() });
+      }
+
+      const { v4: uuidv4 } = require('uuid');
+      const investor = {
+        id:              uuidv4(),
+        name:            req.body.name,
+        initials:        req.body.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+        email:           req.body.email,
+        phone:           req.body.phone           || null,
+        type:            req.body.type            || 'individual',
+        role:            req.body.type === 'entity' ? 'Investisseur personne morale' : 'Investisseur particulier',
+        tier:            req.body.tier            || 'Pilot',
+        investmentClass: req.body.investmentClass || null,
+        amountCommitted: req.body.amountCommitted ? Number(req.body.amountCommitted) : null,
+        status:          req.body.status          || 'prospect',
+        brands:          req.body.brands          || [],
+        iban:            req.body.iban            || null,
+        fsmaAccepted:    req.body.fsmaAccepted    || false,
+        totalInvested:   0,
+        totalRepaid:     0,
+        since:           new Date().toISOString().slice(0, 10),
+        createdAt:       new Date().toISOString(),
+        createdBy:       req.user.email,
+        profile:         { notes: req.body.notes ? [{ id: uuidv4(), author: req.user.email, text: req.body.notes, createdAt: new Date().toISOString(), internal: true }] : [] }
+      };
+
+      INVESTORS.push(investor);
+
+      const { passwordHash, ...safe } = investor; // eslint-disable-line no-unused-vars
+      res.status(201).json({ data: safe, meta: { message: 'Investor profile created.' } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // PUT /api/investors/:id
 // ---------------------------------------------------------------------------
 router.put('/:id', (req, res, next) => {
@@ -258,10 +319,15 @@ router.put('/:id', (req, res, next) => {
     return next(createError(403, 'Access denied', 'FORBIDDEN'));
   }
 
-  const SCALAR_FIELDS = ['name', 'email', 'phone', 'address', 'role', 'tier'];
+  const SCALAR_FIELDS = ['name', 'email', 'phone', 'address'];
   SCALAR_FIELDS.forEach(f => {
     if (req.body[f] !== undefined) investor[f] = req.body[f];
   });
+  // Only admins may change tier or role
+  if (req.user.role === 'admin') {
+    if (req.body.tier !== undefined) investor.tier = req.body.tier;
+    if (req.body.role !== undefined) investor.role = req.body.role;
+  }
 
   if (req.body.profile !== undefined) {
     if (req.user.role !== 'admin' && req.body.profile.notes !== undefined) {

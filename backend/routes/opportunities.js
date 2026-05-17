@@ -135,6 +135,67 @@ router.get('/:id', optionalAuth, (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/opportunities
+// ---------------------------------------------------------------------------
+router.post(
+  '/',
+  authenticate,
+  authorize('admin', 'consultant'),
+  [
+    body('brand').isString().withMessage('brand is required'),
+    body('name').isLength({ min: 2, max: 200 }).withMessage('name is required'),
+    body('city').isLength({ min: 2, max: 100 }).withMessage('city is required'),
+    body('region').optional().isString(),
+    body('format').optional().isString(),
+    body('opening').optional().isString(),
+    body('status').optional().isIn(['En recherche candidat', 'Pré-lancement', 'Closing imminent', 'Co-investissement ouvert']),
+    body('budget').optional().isNumeric(),
+    body('ticketMin').optional().isNumeric(),
+    body('ticketMax').optional().isNumeric(),
+    body('roiTarget').optional().isNumeric(),
+    body('developerId').optional().isString(),
+    body('locationId').optional().isString()
+  ],
+  (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(422).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: errors.array() });
+      }
+
+      const brand = BRANDS.find(b => b.id === req.body.brand);
+      if (!brand) return next(createError(404, `Brand '${req.body.brand}' not found`, 'BRAND_NOT_FOUND'));
+
+      const opp = {
+        id:           uuidv4(),
+        brand:        req.body.brand,
+        name:         req.body.name,
+        city:         req.body.city,
+        region:       req.body.region     || null,
+        format:       req.body.format     || 'Boutique',
+        opening:      req.body.opening    || null,
+        status:       req.body.status     || 'En recherche candidat',
+        budget:       req.body.budget     ? Number(req.body.budget)    : null,
+        ticketMin:    req.body.ticketMin  ? Number(req.body.ticketMin) : null,
+        ticketMax:    req.body.ticketMax  ? Number(req.body.ticketMax) : null,
+        roiTarget:    req.body.roiTarget  ? Number(req.body.roiTarget) : null,
+        developerId:  req.body.developerId  || null,
+        locationId:   req.body.locationId   || null,
+        targetOpenDate: req.body.opening   || null,
+        createdAt:    new Date().toISOString(),
+        createdBy:    req.user.email
+      };
+
+      ONBOARDING_OPPORTUNITIES.push(opp);
+
+      res.status(201).json({ data: opp });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // POST /api/opportunities/:id/interest
 // ---------------------------------------------------------------------------
 router.post(

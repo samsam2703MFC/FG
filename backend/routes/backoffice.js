@@ -5,6 +5,7 @@
  *
  * GET  /api/backoffice/dashboard — aggregate KPIs: counts, pipeline stats, network growth
  * GET  /api/backoffice/stats     — detailed time-series stats for charts
+ * GET  /api/backoffice/tasks     — list CRM tasks (filterable by status / assignedTo)
  *
  * Admin-only. All routes require the 'admin' role.
  *
@@ -271,6 +272,20 @@ router.get('/repayments', (req, res) => {
       filters: { investorId: investorId || null, brand: brand || null, status: status || null }
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/backoffice/tasks
+// ---------------------------------------------------------------------------
+router.get('/tasks', (req, res) => {
+  const { CRM_TASKS } = require('../data/seed');
+  const { status, assignedTo, page = 1, limit = 50 } = req.query;
+  let tasks = [...CRM_TASKS];
+  if (status)     tasks = tasks.filter(t => t.status === status);
+  if (assignedTo) tasks = tasks.filter(t => t.assignedTo === assignedTo);
+  const start = ((parseInt(page,10)||1) - 1) * (parseInt(limit,10)||50);
+  const items = tasks.slice(start, start + (parseInt(limit,10)||50));
+  res.json({ data: items, meta: { total: tasks.length } });
 });
 
 module.exports = router;

@@ -110,7 +110,7 @@ const JOURNEY_TEMPLATE = [
           { code: 's6-i2', label: 'Documentation de l\'apport financier confirmée', required: true },
           { code: 's6-i3', label: 'Alignement partenaire/conjoint confirmé (si applicable)', required: true },
           { code: 's6-i4', label: 'Rendez-vous avec conseil juridique indépendant planifié', required: true },
-          { code: 's6-i5', label: 'Validation Pierre + Loïc avant contrat — Gate G1', required: true },
+          { code: 's6-i5', label: 'Validation COO + Brand Manager avant contrat — Gate G1', required: true },
         ]
       },
       {

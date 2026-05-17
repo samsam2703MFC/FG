@@ -556,7 +556,7 @@ function FranchisePortal() {
         </a>
         <span style={{ color: 'rgba(255,255,255,.20)' }}>|</span>
         <span style={{ color: '#F2C9A0', fontSize: 13, fontWeight: 700, letterSpacing: '0.06em' }}>FRANCHISE PORTAL</span>
-        <span style={{ color: 'rgba(255,255,255,.30)', fontSize: 12 }}>L'Atelier By</span>
+        {record && <span style={{ color: 'rgba(255,255,255,.30)', fontSize: 12 }}>{record.opportunityName || record.brand}</span>}
         <div style={{ flex: 1 }} />
         {record && (
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,.55)', background: 'rgba(255,255,255,.06)', padding: '4px 12px', borderRadius: 20 }}>

@@ -175,6 +175,19 @@ router.put(
 );
 
 // ---------------------------------------------------------------------------
+// DELETE /api/developers/:id  (soft-archive)
+// ---------------------------------------------------------------------------
+router.delete('/:id', authenticate, authorize('admin'), (req, res, next) => {
+  const idx = DEVELOPERS.findIndex(d => d.id === req.params.id);
+  if (idx === -1) return next(createError(404, `Developer '${req.params.id}' not found`, 'DEVELOPER_NOT_FOUND'));
+
+  DEVELOPERS[idx].status = 'archived';
+  DEVELOPERS[idx].archivedAt = new Date().toISOString();
+
+  res.json({ data: { id: DEVELOPERS[idx].id, status: 'archived' } });
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/developers/:id/locations
 // ---------------------------------------------------------------------------
 router.get('/:id/locations', authenticate, authorize('admin'), (req, res, next) => {
