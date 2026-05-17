@@ -1557,64 +1557,6 @@ const AUDIT_LOG = [];
 // keyed by onboardingId — stores the full journey with per-item done/uploaded state
 const ONBOARDING_JOURNEYS = {};
 
-module.exports = {
-  BRANDS,
-  REGIONS,
-  ONBOARDING_OPPORTUNITIES,
-  FG_OPPORTUNITIES,
-  LEAD_STEPS,
-  CANDIDATE_LEADS,
-  OPP_VALIDATION_STATUSES,
-  CANDIDATES,
-  CONCEPT_TYPES,
-  NEW_BRAND_LEADS,
-  INVESTORS,
-  BRAND_PORTFOLIOS,
-  BRAND_PRESENTATION,
-  SHOPS,
-  CONSULTANTS,
-  DEVELOPERS,
-  DOC_TYPES,
-  FG_DOCS,
-  NOTIFICATIONS,
-  SUPPORT_CATEGORIES,
-  SUPPORT_PRIORITIES,
-  SUPPORT_TICKETS,
-  LANDING,
-  USERS,
-  REPAYMENTS,
-  INVESTOR_INTERESTS,
-  INVESTOR_PREFERENCES,
-  SHOP_REPORTS,
-  BENCHMARKS,
-  SHARE_CLASSES,
-  BRANDS_FULL,
-  ONBOARDING_RECORDS,
-  CRM_TASKS,
-  AUDIT_LOG,
-  ONBOARDING_JOURNEYS,
-};
-
-// Script entry: print a summary when run directly
-if (require.main === module) {
-  console.log('Franchise Generation — Seed Data Summary');
-  console.log('=========================================');
-  console.log(`Brands:         ${BRANDS.length}`);
-  console.log(`Regions:        ${REGIONS.length}`);
-  console.log(`Opportunities:  ${ONBOARDING_OPPORTUNITIES.length} onboarding + ${FG_OPPORTUNITIES.length} financing`);
-  console.log(`Candidates:     ${CANDIDATES.length}`);
-  console.log(`Leads:          ${CANDIDATE_LEADS.length}`);
-  console.log(`Investors:      ${INVESTORS.length}`);
-  console.log(`Users:          ${USERS.length}`);
-  console.log(`Consultants:    ${CONSULTANTS.length}`);
-  console.log(`Developers:     ${DEVELOPERS.length}`);
-  console.log(`Documents:      ${FG_DOCS.length}`);
-  console.log(`Notifications:  ${NOTIFICATIONS.length}`);
-  console.log(`Support tickets:${SUPPORT_TICKETS.length}`);
-  console.log('=========================================');
-  console.log('Seed OK — all data loaded.');
-}
-
 // ======================================================================
 // SHARE CLASSES — specific rights per class
 // ======================================================================
@@ -1809,3 +1751,61 @@ const BRANDS_FULL = [
     },
   },
 ];
+
+module.exports = {
+  BRANDS,
+  REGIONS,
+  ONBOARDING_OPPORTUNITIES,
+  FG_OPPORTUNITIES,
+  LEAD_STEPS,
+  CANDIDATE_LEADS,
+  OPP_VALIDATION_STATUSES,
+  CANDIDATES,
+  CONCEPT_TYPES,
+  NEW_BRAND_LEADS,
+  INVESTORS,
+  BRAND_PORTFOLIOS,
+  BRAND_PRESENTATION,
+  SHOPS,
+  CONSULTANTS,
+  DEVELOPERS,
+  DOC_TYPES,
+  FG_DOCS,
+  NOTIFICATIONS,
+  SUPPORT_CATEGORIES,
+  SUPPORT_PRIORITIES,
+  SUPPORT_TICKETS,
+  LANDING,
+  USERS,
+  REPAYMENTS,
+  INVESTOR_INTERESTS,
+  INVESTOR_PREFERENCES,
+  SHOP_REPORTS,
+  BENCHMARKS,
+  SHARE_CLASSES,
+  BRANDS_FULL,
+  ONBOARDING_RECORDS,
+  CRM_TASKS,
+  AUDIT_LOG,
+  ONBOARDING_JOURNEYS,
+};
+
+// Script entry: print a summary when run directly
+if (require.main === module) {
+  console.log('Franchise Generation — Seed Data Summary');
+  console.log('=========================================');
+  console.log(`Brands:         ${BRANDS.length}`);
+  console.log(`Regions:        ${REGIONS.length}`);
+  console.log(`Opportunities:  ${ONBOARDING_OPPORTUNITIES.length} onboarding + ${FG_OPPORTUNITIES.length} financing`);
+  console.log(`Candidates:     ${CANDIDATES.length}`);
+  console.log(`Leads:          ${CANDIDATE_LEADS.length}`);
+  console.log(`Investors:      ${INVESTORS.length}`);
+  console.log(`Users:          ${USERS.length}`);
+  console.log(`Consultants:    ${CONSULTANTS.length}`);
+  console.log(`Developers:     ${DEVELOPERS.length}`);
+  console.log(`Documents:      ${FG_DOCS.length}`);
+  console.log(`Notifications:  ${NOTIFICATIONS.length}`);
+  console.log(`Support tickets:${SUPPORT_TICKETS.length}`);
+  console.log('=========================================');
+  console.log('Seed OK — all data loaded.');
+}
