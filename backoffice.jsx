@@ -474,8 +474,153 @@ function BoBrands({ ctx }) {
 // ====================================================================
 // CANDIDATES
 // ====================================================================
+function CandidateDetailPanel({ candidate, leads, allOpps, closedMap, onClose, onRequestValidate }) {
+  const region = null; // resolved by parent
+  return (
+    <>
+      <div className="bo-panel-backdrop" onClick={onClose} />
+      <aside className="bo-panel" style={{ maxWidth: 560 }}>
+        <header className="bo-panel__head">
+          <div>
+            <p className="bo-panel__eyebrow">Candidate · Profil</p>
+            <h2 className="bo-panel__title">{candidate.firstName} {candidate.lastName}</h2>
+            <p className="bo-panel__sub">{candidate.email} · {candidate.phone}</p>
+          </div>
+          <button className="bo-panel__close" onClick={onClose}>✕</button>
+        </header>
+
+        <div className="bo-panel__body">
+          {/* Info block */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 32, fontSize: 13 }}>
+            <div><p style={{ color: 'rgba(14,27,40,.5)', marginBottom: 2 }}>Budget</p><strong>{candidate.budget?.toLocaleString('fr-BE')} €</strong></div>
+            <div><p style={{ color: 'rgba(14,27,40,.5)', marginBottom: 2 }}>Apport estimé</p><strong>{candidate.financingCapacity ? candidate.financingCapacity.slice(0, 30) + '…' : '—'}</strong></div>
+            <div><p style={{ color: 'rgba(14,27,40,.5)', marginBottom: 2 }}>Statut</p><BoStatus tone="warning">{candidate.generalStatus}</BoStatus></div>
+          </div>
+
+          {candidate.motivation && (
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'rgba(14,27,40,.7)', fontStyle: 'italic' }}>
+              "{candidate.motivation}"
+            </div>
+          )}
+
+          {/* Leads / opportunities */}
+          <div style={{ padding: '12px 20px 6px' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', color: 'rgba(14,27,40,.45)', textTransform: 'uppercase', marginBottom: 10 }}>
+              Opportunités ({leads.length})
+            </p>
+          </div>
+
+          {!leads.length && (
+            <div className="bo-panel__empty">Aucun lead actif pour ce candidat.</div>
+          )}
+
+          {leads.map(lead => {
+            const opp = allOpps.find(o => o.id === lead.opportunity) || { id: lead.opportunity, name: lead.opportunity };
+            const isClosed = opp.status === 'closed-won' || !!closedMap[opp.id];
+            const isWinner = isClosed && opp.validatedCandidateId === lead.id;
+            const portalId = closedMap[opp.id]?.onboardingId || null;
+
+            return (
+              <div key={lead.id} className={`bo-candidate-card${lead.priority === 'high' ? ' bo-candidate-card--high' : ''}`}>
+                <div className="bo-candidate-card__top">
+                  <div className="bo-candidate-card__info" style={{ flex: 1 }}>
+                    <p className="bo-candidate-card__name" style={{ fontSize: 14 }}>{opp.name}</p>
+                    <p className="bo-candidate-card__contact">
+                      {opp.city || opp.location || ''}{opp.brand ? ` · ${opp.brand}` : ''}
+                    </p>
+                    <p className="bo-candidate-card__meta">
+                      <span>Consultant: {lead.assignedTo?.name || '—'}</span>
+                      <span> · Source: {lead.source}</span>
+                    </p>
+                  </div>
+                  {!isClosed && (
+                    <button className="bo-btn bo-btn--primary bo-btn--sm"
+                      onClick={() => onRequestValidate(lead, opp)}>
+                      ✓ Valider
+                    </button>
+                  )}
+                  {isWinner && <span className="bo-validated-badge">✓ Validé</span>}
+                  {isClosed && !isWinner && <BoStatus tone="muted">Non retenu</BoStatus>}
+                </div>
+
+                <div className="bo-candidate-card__pipeline">
+                  <BoStatus tone={stepTone(lead.currentStep)}>
+                    {STEP_LABELS[lead.currentStep] || lead.currentStep}
+                  </BoStatus>
+                  {isWinner && portalId && (
+                    <a className="bo-btn bo-btn--ghost bo-btn--xs"
+                       href={`franchise-portal.html?id=${portalId}`}
+                       target="_blank" rel="noopener noreferrer"
+                       onClick={e => e.stopPropagation()}>
+                      Portail franchisé →
+                    </a>
+                  )}
+                </div>
+
+                {lead.notes && (
+                  <p className="bo-candidate-card__notes">{lead.notes}</p>
+                )}
+
+                <div className="bo-candidate-card__foot">
+                  <span>Prochaine action: {lead.nextAction || '—'}</span>
+                  <span>Créé: {lead.createdAt?.slice(0, 10)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+    </>
+  );
+}
+
 function BoCandidates({ ctx }) {
   const { FG } = ctx;
+  const currentUser = window.FG_CURRENT_USER || {};
+  const [selectedCandidate, setSelectedCandidate] = React.useState(null);
+  const [confirmLead,       setConfirmLead]       = React.useState(null); // { lead, opp }
+  const [successData,       setSuccessData]       = React.useState(null);
+  const [closedMap,         setClosedMap]         = React.useState({});
+
+  const allOpps = FG.ONBOARDING_OPPORTUNITIES;
+
+  // Find leads for a candidate by email match
+  const leadsFor = (candidate) =>
+    FG.CANDIDATE_LEADS.filter(l => l.candidate.email === candidate.email);
+
+  const handleConfirmValidate = async () => {
+    const { lead, opp } = confirmLead;
+    const capturedOpp = opp;
+
+    setConfirmLead(null);
+    await new Promise(r => setTimeout(r, 0));
+
+    let onboardingId = null;
+    try {
+      const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
+      const res = await fetch(`/api/opportunities/${opp.id}/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ candidateId: lead.id }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        onboardingId = json?.data?.onboardingRecord?.id || null;
+      }
+    } catch (_) { /* demo: proceed regardless */ }
+
+    setClosedMap(m => ({
+      ...m,
+      [opp.id]: { validatedCandidateId: lead.id, validatedBy: currentUser.email, validatedAt: new Date().toISOString(), onboardingId }
+    }));
+    const liveOpp = allOpps.find(o => o.id === opp.id);
+    if (liveOpp) { liveOpp.status = 'closed-won'; liveOpp.validatedCandidateId = lead.id; }
+
+    setSelectedCandidate(null);
+    setSuccessData({ lead, opp: capturedOpp, onboardingId });
+  };
+
   return (
     <>
       <BoHead eyebrow="People · Candidates" title="Candidate management"
@@ -492,6 +637,7 @@ function BoCandidates({ ctx }) {
         { label: 'Capital', kind: 'select', options: ['Any', '< 25k', '25k–75k', '75k–150k', '150k+'] }
       ]}/>
       <BoTable
+        onRow={setSelectedCandidate}
         columns={[
           { k: 'name', l: 'Candidate', render: (r) => (
             <span className="bo-cell-brand">
@@ -506,12 +652,47 @@ function BoCandidates({ ctx }) {
           )},
           { k: 'region',  l: 'Region',  render: (r) => FG.REGIONS.find(x => x.id === r.preferredRegion)?.label },
           { k: 'budget',  l: 'Budget',  render: (r) => FG.fmtEur(r.budget) },
-          { k: 'opps',    l: 'Opportunities', render: (r) => `${r.opportunities.length} leads` },
+          { k: 'opps',    l: 'Opportunities', render: (r) => `${leadsFor(r).length} leads` },
           { k: 'status',  l: 'Status',  render: (r) => <BoStatus tone={r.opportunities.some(o => o.validationStatus === 'validated') ? 'success' : 'warning'}>{r.generalStatus}</BoStatus> },
-          { k: 'go', l: '', align: 'right', render: (r) => <a className="bo-btn bo-btn--ghost bo-btn--xs" href={'candidate-profile.html?candidate=' + r.id}>Open →</a> }
+          { k: 'go', l: '', align: 'right', render: (r) => (
+            <button className="bo-btn bo-btn--ghost bo-btn--xs" onClick={e => { e.stopPropagation(); setSelectedCandidate(r); }}>Voir →</button>
+          )}
         ]}
         rows={FG.CANDIDATES}
       />
+
+      {/* Slide-in panel */}
+      {selectedCandidate && (
+        <CandidateDetailPanel
+          candidate={selectedCandidate}
+          leads={leadsFor(selectedCandidate)}
+          allOpps={allOpps}
+          closedMap={closedMap}
+          onClose={() => setSelectedCandidate(null)}
+          onRequestValidate={(lead, opp) => setConfirmLead({ lead, opp })}
+        />
+      )}
+
+      {/* Step 1 — confirm modal */}
+      {confirmLead && (
+        <ValidateConfirmModal
+          candidate={confirmLead.lead}
+          opp={confirmLead.opp}
+          losersCount={FG.CANDIDATE_LEADS.filter(l => l.opportunity === confirmLead.opp?.id && l.id !== confirmLead.lead.id).length}
+          onClose={() => setConfirmLead(null)}
+          onConfirm={handleConfirmValidate}
+        />
+      )}
+
+      {/* Step 2 — success modal with portal link */}
+      {successData && (
+        <ValidationSuccessModal
+          candidate={successData.lead}
+          opp={successData.opp}
+          onboardingId={successData.onboardingId}
+          onClose={() => setSuccessData(null)}
+        />
+      )}
     </>
   );
 }
