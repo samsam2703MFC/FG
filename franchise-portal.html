@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Franchise Portal — L'Atelier By</title>
+  <link rel="stylesheet" href="backoffice.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="fg-mode">
+
+<script>
+  // Auth guard: admin or consultant only
+  (function () {
+    var stored = {};
+    try { stored = JSON.parse(localStorage.getItem('fg_auth') || '{}'); } catch (_) {}
+    var allowed = ['admin', 'consultant'];
+    if (!stored.token || !stored.user || !allowed.includes(stored.user.role)) {
+      window.location.replace('index.html');
+    }
+    window.FG_CURRENT_USER = stored.user || {};
+  })();
+</script>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" src="franchise-portal.jsx" data-type="module"></script>
+</body>
+</html>

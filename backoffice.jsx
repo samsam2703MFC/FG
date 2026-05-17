@@ -878,7 +878,7 @@ function ValidateConfirmModal({ candidate, opp, losersCount, onClose, onConfirm 
 // Step 2 — success / onboarding detail modal.
 // Only ever mounts after ValidateConfirmModal is fully unmounted (parent guarantees sequencing).
 // Same z-index pattern: single backdrop, no overlap possible.
-function ValidationSuccessModal({ candidate, opp, onClose }) {
+function ValidationSuccessModal({ candidate, opp, onboardingId, onClose }) {
   const modalRef = React.useRef(null);
   React.useEffect(() => { modalRef.current?.focus(); }, []);
 
@@ -933,7 +933,14 @@ function ValidationSuccessModal({ candidate, opp, onClose }) {
           </div>
         </div>
         <footer className="bo-modal__actions">
-          <button className="bo-btn bo-btn--primary" onClick={onClose}>Fermer</button>
+          {onboardingId && (
+            <a className="bo-btn bo-btn--primary"
+               href={`franchise-portal.html?id=${onboardingId}`}
+               target="_blank" rel="noopener noreferrer">
+              Ouvrir le portail franchisé →
+            </a>
+          )}
+          <button className={`bo-btn ${onboardingId ? 'bo-btn--ghost' : 'bo-btn--primary'}`} onClick={onClose}>Fermer</button>
         </footer>
       </div>
     </>
@@ -975,14 +982,19 @@ function BoOpportunities({ ctx }) {
     setConfirmLead(null); // step 1 — first modal unmounts
     await new Promise(r => setTimeout(r, 0)); // step 2 — let React commit
 
+    let onboardingId = null;
     try { // step 3 — transaction
       const token = (() => { try { return JSON.parse(localStorage.getItem('fg_auth') || '{}').token || ''; } catch { return ''; } })();
-      await fetch(`/api/opportunities/${oppId}/validate`, {
+      const res = await fetch(`/api/opportunities/${oppId}/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ candidateId: lead.id }),
         signal: AbortSignal.timeout(5000),
       });
+      if (res.ok) {
+        const json = await res.json();
+        onboardingId = json?.data?.onboardingRecord?.id || null;
+      }
     } catch (_) { /* demo: proceed regardless */ }
 
     setClosedMap(m => ({
@@ -993,7 +1005,7 @@ function BoOpportunities({ ctx }) {
     if (opp) { opp.status = 'closed-won'; opp.validatedCandidateId = lead.id; }
 
     setPanelOppId(null);          // step 4 — close panel…
-    setSuccessData({ lead, opp: capturedOpp }); // …and open second modal in same batch
+    setSuccessData({ lead, opp: capturedOpp, onboardingId }); // …and open second modal in same batch
   };
 
   return (
@@ -1085,6 +1097,7 @@ function BoOpportunities({ ctx }) {
         <ValidationSuccessModal
           candidate={successData.lead}
           opp={successData.opp}
+          onboardingId={successData.onboardingId}
           onClose={() => setSuccessData(null)}
         />
       )}

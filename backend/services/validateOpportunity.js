@@ -1,6 +1,7 @@
 'use strict';
 
 const { v4: uuidv4 } = require('uuid');
+const { createJourney } = require('./createJourney');
 
 function addBusinessDays(date, days) {
   const result = new Date(date);
@@ -21,7 +22,7 @@ function createError(status, message, code) {
 }
 
 function validateOpportunity({ oppId, candidateId, validatedBy, collections }) {
-  const { ONBOARDING_OPPORTUNITIES, CANDIDATE_LEADS, ONBOARDING_RECORDS, CRM_TASKS, AUDIT_LOG } = collections;
+  const { ONBOARDING_OPPORTUNITIES, CANDIDATE_LEADS, ONBOARDING_RECORDS, CRM_TASKS, AUDIT_LOG, ONBOARDING_JOURNEYS } = collections;
 
   const opp = ONBOARDING_OPPORTUNITIES.find(o => o.id === oppId);
   if (!opp) throw createError(404, `Opportunity '${oppId}' not found`, 'NOT_FOUND');
@@ -39,18 +40,31 @@ function validateOpportunity({ oppId, candidateId, validatedBy, collections }) {
 
   const now = new Date();
 
+  const onboardingId = uuidv4();
   const onboardingRecord = {
-    id: uuidv4(),
+    id: onboardingId,
     opportunityId: oppId,
+    opportunityName: opp.name,
+    opportunityCity: opp.city || opp.location || null,
     candidateId,
     candidateName: winner.candidate.name,
+    candidateEmail: winner.candidate.email || null,
+    candidatePhone: winner.candidate.phone || null,
     brand: opp.brand,
+    targetOpenDate: opp.targetOpenDate || null,
     stage: 'préparation contrat',
+    currentStepCode: 's6',
     validatedBy,
     createdAt: now.toISOString(),
     status: 'active'
   };
   ONBOARDING_RECORDS.push(onboardingRecord);
+
+  // Create full franchise journey for this candidate
+  if (ONBOARDING_JOURNEYS) {
+    const journey = createJourney(onboardingId);
+    ONBOARDING_JOURNEYS[onboardingId] = journey;
+  }
 
   const crmTasks = losers.map(l => ({
     id: uuidv4(),

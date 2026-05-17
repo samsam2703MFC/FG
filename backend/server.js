@@ -38,6 +38,7 @@ const consultantsRouter   = require('./routes/consultants');
 const developersRouter    = require('./routes/developers');
 const backofficeRouter    = require('./routes/backoffice');
 const shopsRouter         = require('./routes/shops');
+const onboardingRouter    = require('./routes/onboarding');
 
 // ---- Error handlers ----
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -219,6 +220,7 @@ app.use('/api/consultants',   consultantsRouter);
 app.use('/api/developers',    developersRouter);
 app.use('/api/backoffice',    backofficeRouter);
 app.use('/api/shops',        shopsRouter);
+app.use('/api/onboarding',   onboardingRouter);
 
 // ============================================================================
 // 404 + error handler (must be last)

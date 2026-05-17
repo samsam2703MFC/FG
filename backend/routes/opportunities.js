@@ -41,7 +41,8 @@ const {
   REGIONS,
   ONBOARDING_RECORDS,
   CRM_TASKS,
-  AUDIT_LOG
+  AUDIT_LOG,
+  ONBOARDING_JOURNEYS
 } = require('../data/seed');
 const { createError } = require('../middleware/errorHandler');
 const { validateOpportunity } = require('../services/validateOpportunity');
@@ -229,7 +230,7 @@ router.post(
         oppId: req.params.id,
         candidateId,
         validatedBy: req.user.email,
-        collections: { ONBOARDING_OPPORTUNITIES, CANDIDATE_LEADS, ONBOARDING_RECORDS, CRM_TASKS, AUDIT_LOG }
+        collections: { ONBOARDING_OPPORTUNITIES, CANDIDATE_LEADS, ONBOARDING_RECORDS, CRM_TASKS, AUDIT_LOG, ONBOARDING_JOURNEYS }
       });
 
       res.status(200).json({

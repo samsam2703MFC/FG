@@ -1554,6 +1554,8 @@ const INVESTOR_PREFERENCES = [
 const ONBOARDING_RECORDS = [];
 const CRM_TASKS = [];
 const AUDIT_LOG = [];
+// keyed by onboardingId — stores the full journey with per-item done/uploaded state
+const ONBOARDING_JOURNEYS = {};
 
 module.exports = {
   BRANDS,
@@ -1590,6 +1592,7 @@ module.exports = {
   ONBOARDING_RECORDS,
   CRM_TASKS,
   AUDIT_LOG,
+  ONBOARDING_JOURNEYS,
 };
 
 // Script entry: print a summary when run directly
