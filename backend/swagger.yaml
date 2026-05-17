@@ -1,0 +1,1974 @@
+openapi: 3.0.3
+info:
+  title: Franchise Generation API
+  description: |
+    Backend API for the Franchise Generation multi-brand franchise ecosystem.
+    Handles candidates, investors, developers, brands, opportunities, onboarding journeys, and CRM.
+
+    **Demo credentials** (password: `password`):
+    - Admin → `admin@fg.be`
+    - Consultant → `sophie.renard@fg.be`
+    - Investor → `claire.vermeulen@example.com`
+  version: 1.0.0
+  contact:
+    name: FG Platform Team
+    email: admin@fg.be
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:   { type: string }
+        code:    { type: string }
+        details: { type: array, items: { type: object } }
+
+    Token:
+      type: object
+      properties:
+        token: { type: string }
+        user:
+          type: object
+          properties:
+            id:           { type: string }
+            email:        { type: string }
+            role:         { type: string, enum: [admin, consultant, investor] }
+            name:         { type: string }
+            active:       { type: boolean }
+
+    Brand:
+      type: object
+      properties:
+        id:           { type: string }
+        name:         { type: string }
+        tagline:      { type: string }
+        kind:         { type: string }
+        city:         { type: string }
+        headquarters: { type: string }
+        founded:      { type: integer }
+        established:  { type: string }
+        logoSrc:      { type: string }
+        logoMark:     { type: string }
+        theme:        { type: string }
+        tokens:
+          type: object
+          properties:
+            primary:     { type: string }
+            secondary:   { type: string }
+            ink:         { type: string }
+            bg:          { type: string }
+            surface:     { type: string }
+            accent:      { type: string }
+            fontDisplay: { type: string }
+            fontUi:      { type: string }
+            fontAccent:  { type: string }
+
+    Opportunity:
+      type: object
+      properties:
+        id:            { type: string }
+        brand:         { type: string }
+        name:          { type: string }
+        city:          { type: string }
+        region:        { type: string, nullable: true }
+        format:        { type: string }
+        opening:       { type: string, nullable: true }
+        status:        { type: string, enum: [En recherche candidat, Pré-lancement, Closing imminent, Co-investissement ouvert, closed-won] }
+        budget:        { type: number, nullable: true }
+        ticketMin:     { type: number, nullable: true }
+        ticketMax:     { type: number, nullable: true }
+        roiTarget:     { type: number, nullable: true }
+        developerId:   { type: string, nullable: true }
+        locationId:    { type: string, nullable: true }
+        targetOpenDate: { type: string, nullable: true }
+        createdAt:     { type: string, format: date-time }
+
+    Candidate:
+      type: object
+      properties:
+        id:               { type: string }
+        firstName:        { type: string }
+        lastName:         { type: string }
+        email:            { type: string }
+        phone:            { type: string, nullable: true }
+        address:          { type: string, nullable: true }
+        preferredRegion:  { type: string, nullable: true }
+        language:         { type: string, nullable: true }
+        experience:       { type: string, nullable: true }
+        currentSituation: { type: string, nullable: true }
+        motivation:       { type: string, nullable: true }
+        budget:           { type: number, nullable: true }
+        financingCapacity: { type: string, nullable: true }
+        brandPreference:  { type: array, items: { type: string } }
+        generalStatus:    { type: string }
+        createdAt:        { type: string, format: date-time }
+
+    Lead:
+      type: object
+      properties:
+        id:          { type: string }
+        candidate:
+          type: object
+          properties:
+            name:  { type: string }
+            email: { type: string }
+            phone: { type: string, nullable: true }
+        opportunity: { type: string }
+        currentStep: { type: string }
+        priority:    { type: string, enum: [high, normal, low] }
+        source:      { type: string }
+        status:      { type: string }
+        notes:       { type: string, nullable: true }
+        nextAction:  { type: string, nullable: true }
+        assignedTo:
+          type: object
+          nullable: true
+          properties:
+            id:   { type: string }
+            name: { type: string }
+        createdAt:   { type: string, format: date-time }
+
+    Investor:
+      type: object
+      properties:
+        id:              { type: string }
+        name:            { type: string }
+        initials:        { type: string }
+        email:           { type: string }
+        phone:           { type: string, nullable: true }
+        type:            { type: string, enum: [individual, entity] }
+        role:            { type: string }
+        tier:            { type: string, enum: [Pilot, Standard, Privilège, Premium] }
+        investmentClass: { type: string, enum: [A, B, C, D], nullable: true }
+        amountCommitted: { type: number }
+        status:          { type: string, enum: [prospect, signed, funded] }
+        brands:          { type: array, items: { type: string } }
+        totalInvested:   { type: number }
+        totalRepaid:     { type: number }
+        since:           { type: string }
+        createdAt:       { type: string, format: date-time }
+
+    Developer:
+      type: object
+      properties:
+        id:          { type: string }
+        name:        { type: string }
+        contactName: { type: string }
+        email:       { type: string }
+        phone:       { type: string, nullable: true }
+        type:        { type: string }
+        regions:     { type: array, items: { type: string } }
+        status:      { type: string, enum: [active, pending, inactive, rejected, archived] }
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              id:           { type: string }
+              address:      { type: string }
+              surface:      { type: string }
+              type:         { type: string }
+              availability: { type: string }
+              rent:         { type: number }
+              status:       { type: string }
+        submittedAt: { type: string, format: date-time }
+
+    OnboardingRecord:
+      type: object
+      properties:
+        id:              { type: string }
+        opportunityId:   { type: string }
+        opportunityName: { type: string }
+        opportunityCity: { type: string, nullable: true }
+        candidateId:     { type: string }
+        candidateName:   { type: string }
+        candidateEmail:  { type: string, nullable: true }
+        candidatePhone:  { type: string, nullable: true }
+        brand:           { type: string }
+        targetOpenDate:  { type: string, nullable: true }
+        stage:           { type: string }
+        currentStepCode: { type: string }
+        validatedBy:     { type: string }
+        status:          { type: string, enum: [active, completed, suspended] }
+        createdAt:       { type: string, format: date-time }
+
+    CrmTask:
+      type: object
+      properties:
+        id:            { type: string }
+        type:          { type: string }
+        candidateId:   { type: string }
+        candidateName: { type: string }
+        opportunityId: { type: string }
+        assignedTo:    { type: string }
+        status:        { type: string, enum: [pending, done, cancelled] }
+        dueAt:         { type: string, format: date-time }
+        createdAt:     { type: string, format: date-time }
+        note:          { type: string }
+
+    Meta:
+      type: object
+      properties:
+        total: { type: integer }
+        page:  { type: integer }
+        limit: { type: integer }
+        pages: { type: integer }
+
+tags:
+  - name: Auth
+    description: Authentication and user profile
+  - name: Brands
+    description: Brand management
+  - name: Opportunities
+    description: Franchise opportunities
+  - name: Candidates
+    description: Candidate profiles and pipeline
+  - name: Investors
+    description: Investor management
+  - name: Developers
+    description: Real-estate developers and locations
+  - name: Consultants
+    description: Consultant profiles and leads
+  - name: Leads
+    description: CRM lead management
+  - name: Onboarding
+    description: Franchise onboarding journeys
+  - name: Backoffice
+    description: Admin dashboard and internal data
+  - name: Shops
+    description: Active franchise shops
+  - name: Documents
+    description: Document management
+  - name: Notifications
+    description: User notifications
+  - name: Support
+    description: Support tickets and messaging
+  - name: Regions
+    description: Geographic regions
+  - name: Landing
+    description: Public landing page content
+
+paths:
+
+  # ─────────────────────────────────────────────────────────────
+  # AUTH
+  # ─────────────────────────────────────────────────────────────
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and obtain JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:    { type: string, format: email, example: admin@fg.be }
+                password: { type: string, example: password }
+      responses:
+        '200':
+          description: JWT token and user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Token' }
+        '401': { description: Invalid credentials }
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (invalidate session)
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:           { type: string }
+                      email:        { type: string }
+                      name:         { type: string }
+                      role:         { type: string }
+                      investorId:   { type: string, nullable: true }
+                      consultantId: { type: string, nullable: true }
+    put:
+      tags: [Auth]
+      summary: Update current user profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:  { type: string, minLength: 2, maxLength: 100 }
+                phone: { type: string }
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Updated profile }
+
+  /api/auth/me/preferences:
+    get:
+      tags: [Auth]
+      summary: Get investor preferences (investor only)
+      responses:
+        '200':
+          description: Investor preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      investorId:       { type: string }
+                      notifications:    { type: object }
+                      preferredBrands:  { type: array, items: { type: string } }
+                      preferredRegions: { type: array, items: { type: string } }
+                      riskProfile:      { type: string, enum: [conservative, moderate, aggressive] }
+                      currency:         { type: string }
+                      language:         { type: string }
+    put:
+      tags: [Auth]
+      summary: Update investor preferences (investor only)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notifications:    { type: object }
+                preferredBrands:  { type: array, items: { type: string } }
+                preferredRegions: { type: array, items: { type: string } }
+                riskProfile:      { type: string, enum: [conservative, moderate, aggressive] }
+                currency:         { type: string, minLength: 3, maxLength: 3 }
+                language:         { type: string, minLength: 2, maxLength: 5 }
+      responses:
+        '200': { description: Updated preferences }
+
+  # ─────────────────────────────────────────────────────────────
+  # BRANDS
+  # ─────────────────────────────────────────────────────────────
+  /api/brands:
+    get:
+      tags: [Brands]
+      summary: List all brands
+      security: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+          description: Filter by brand status
+      responses:
+        '200':
+          description: List of brands
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Brand' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+    post:
+      tags: [Brands]
+      summary: Create a new brand (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:           { type: string, example: "La Nouvelle Enseigne" }
+                slug:           { type: string }
+                tagline:        { type: string }
+                kind:           { type: string, example: "Boulangerie · Café" }
+                city:           { type: string, example: "Bruxelles" }
+                headquarters:   { type: string }
+                yearFounded:    { type: integer }
+                legalName:      { type: string }
+                countryOfOrigin: { type: string, example: "BE" }
+                status:         { type: string, enum: [in-development, active, archived] }
+                tokens:         { type: object }
+                isDraft:        { type: boolean }
+                brandManager:   { type: string }
+                internalNotes:  { type: string }
+      responses:
+        '201':
+          description: Brand created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: object }
+                  message: { type: string }
+        '409': { description: Brand slug already exists }
+
+  /api/brands/share-classes:
+    get:
+      tags: [Brands]
+      summary: List share class definitions
+      security: []
+      responses:
+        '200':
+          description: Share classes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:                   { type: string, enum: [A, B, C, D] }
+                        label:                { type: string }
+                        description:          { type: string }
+                        votingMultiplier:     { type: integer }
+                        dividendPriority:     { type: integer }
+                        liquidationPriority:  { type: integer }
+                        transferRestrictions: { type: string }
+                        notes:                { type: string }
+
+  /api/brands/{id}:
+    get:
+      tags: [Brands]
+      summary: Get a single brand
+      security: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string }, example: atelier }
+      responses:
+        '200': { description: Brand object with portfolio summary }
+        '404': { description: Brand not found }
+    put:
+      tags: [Brands]
+      summary: Update a brand (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:          { type: string }
+                tagline:       { type: string }
+                kind:          { type: string }
+                city:          { type: string }
+                headquarters:  { type: string }
+                yearFounded:   { type: integer }
+                status:        { type: string }
+                tokens:        { type: object }
+                logoSrc:       { type: string }
+                isDraft:       { type: boolean }
+                brandManager:  { type: string }
+                internalNotes: { type: string }
+      responses:
+        '200': { description: Updated brand }
+        '404': { description: Brand not found }
+    delete:
+      tags: [Brands]
+      summary: Archive a brand (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Brand archived }
+        '404': { description: Brand not found }
+
+  /api/brands/{id}/full:
+    get:
+      tags: [Brands]
+      summary: Get full brand record with all 8 sections (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Full brand record }
+
+  /api/brands/{id}/presentation:
+    get:
+      tags: [Brands]
+      summary: Get brand CMS presentation
+      security: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Brand and presentation object }
+
+  /api/brands/{id}/shops:
+    get:
+      tags: [Brands]
+      summary: List shops for a brand
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Shop list }
+
+  /api/brands/{id}/opportunities:
+    get:
+      tags: [Brands]
+      summary: List financing opportunities for a brand
+      security: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Opportunity list }
+
+  /api/brands/{id}/team:
+    get:
+      tags: [Brands]
+      summary: Get brand team members
+      security: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Team list }
+
+  /api/brands/{id}/documents:
+    get:
+      tags: [Brands]
+      summary: List documents for a brand
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Document list }
+
+  /api/brands/{id}/portfolio:
+    get:
+      tags: [Brands]
+      summary: Get brand portfolio summary
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Portfolio data }
+
+  # ─────────────────────────────────────────────────────────────
+  # OPPORTUNITIES
+  # ─────────────────────────────────────────────────────────────
+  /api/opportunities:
+    get:
+      tags: [Opportunities]
+      summary: List all opportunities
+      security: []
+      parameters:
+        - { in: query, name: brand,  schema: { type: string } }
+        - { in: query, name: region, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: type,   schema: { type: string, enum: [onboarding, financing, all] }, description: "Default: all" }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: Opportunity list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Opportunity' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+    post:
+      tags: [Opportunities]
+      summary: Create a new onboarding opportunity (admin/consultant)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [brand, name, city]
+              properties:
+                brand:      { type: string, example: atelier }
+                name:       { type: string, minLength: 2, maxLength: 200, example: "L'Atelier By Saint-Gilles" }
+                city:       { type: string, minLength: 2, maxLength: 100, example: "Bruxelles" }
+                region:     { type: string }
+                format:     { type: string, example: Boutique }
+                opening:    { type: string, example: "Q3 2026" }
+                status:     { type: string, enum: [En recherche candidat, Pré-lancement, Closing imminent, Co-investissement ouvert] }
+                budget:     { type: number }
+                ticketMin:  { type: number }
+                ticketMax:  { type: number }
+                roiTarget:  { type: number }
+                developerId: { type: string }
+                locationId:  { type: string }
+      responses:
+        '201':
+          description: Opportunity created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Opportunity' }
+
+  /api/opportunities/validation-statuses:
+    get:
+      tags: [Opportunities]
+      summary: List validation status definitions
+      security: []
+      responses:
+        '200': { description: Validation statuses }
+
+  /api/opportunities/{id}:
+    get:
+      tags: [Opportunities]
+      summary: Get a single opportunity
+      security: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string }, example: op-bxl-cookies }
+      responses:
+        '200': { description: Opportunity with brandDetail }
+        '404': { description: Not found }
+
+  /api/opportunities/{id}/interest:
+    post:
+      tags: [Opportunities]
+      summary: Express investor interest in an opportunity
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:  { type: number }
+                message: { type: string, maxLength: 1000 }
+      responses:
+        '201': { description: Interest recorded }
+
+  /api/opportunities/{id}/candidates:
+    get:
+      tags: [Opportunities]
+      summary: List candidate leads for an opportunity (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Candidate lead list }
+
+  /api/opportunities/{id}/interests:
+    get:
+      tags: [Opportunities]
+      summary: List investor interests for an opportunity (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Investor interest list }
+
+  /api/opportunities/{id}/validate:
+    post:
+      tags: [Opportunities]
+      summary: Validate a candidate — close opportunity and start onboarding (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string }, example: op-bxl-cookies }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidateId]
+              properties:
+                candidateId: { type: string, example: lead-001, description: "ID of the winning candidate lead" }
+      responses:
+        '200':
+          description: Opportunity closed, onboarding started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      onboardingRecord: { $ref: '#/components/schemas/OnboardingRecord' }
+                      crmTasksCreated: { type: integer }
+                      opportunity:
+                        type: object
+                        properties:
+                          id:                   { type: string }
+                          status:               { type: string }
+                          validatedCandidateId: { type: string }
+                          validatedAt:          { type: string, format: date-time }
+                  message: { type: string }
+        '404': { description: Opportunity or candidate not found }
+        '409': { description: Opportunity already closed }
+
+  # ─────────────────────────────────────────────────────────────
+  # CANDIDATES
+  # ─────────────────────────────────────────────────────────────
+  /api/candidates:
+    get:
+      tags: [Candidates]
+      summary: List candidates (admin/consultant)
+      parameters:
+        - { in: query, name: brand,  schema: { type: string } }
+        - { in: query, name: region, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: Candidate list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Candidate' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+    post:
+      tags: [Candidates]
+      summary: Create a candidate profile (admin/consultant)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email]
+              properties:
+                firstName:        { type: string, minLength: 1, maxLength: 100, example: Marie }
+                lastName:         { type: string, minLength: 1, maxLength: 100, example: Lemoine }
+                email:            { type: string, format: email }
+                phone:            { type: string }
+                budget:           { type: number }
+                preferredRegion:  { type: string }
+                brandPreference:  { type: array, items: { type: string } }
+                address:          { type: string }
+                language:         { type: string }
+                experience:       { type: string }
+                currentSituation: { type: string }
+                motivation:       { type: string }
+                financingCapacity: { type: string }
+                locationPreference: { type: string }
+                internalNotes:    { type: string }
+                generalStatus:    { type: string, example: "En pré-analyse" }
+      responses:
+        '201':
+          description: Candidate created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Candidate' }
+        '409': { description: Email already exists }
+
+  /api/candidates/{id}:
+    get:
+      tags: [Candidates]
+      summary: Get a single candidate with leads (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Candidate with leads array }
+        '404': { description: Not found }
+    put:
+      tags: [Candidates]
+      summary: Update a candidate (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:        { type: string }
+                lastName:         { type: string }
+                email:            { type: string, format: email }
+                phone:            { type: string }
+                budget:           { type: number }
+                preferredRegion:  { type: string }
+                brandPreference:  { type: array, items: { type: string } }
+                generalStatus:    { type: string }
+                internalNotes:    { type: string }
+      responses:
+        '200': { description: Updated candidate }
+
+  /api/candidates/{id}/leads:
+    get:
+      tags: [Candidates]
+      summary: List leads for a candidate (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Lead list }
+    post:
+      tags: [Candidates]
+      summary: Create a lead for a candidate (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [opportunityId, brand]
+              properties:
+                opportunityId: { type: string }
+                brand:         { type: string }
+                assignedTo:    { type: string }
+                priority:      { type: string, enum: [high, normal, low] }
+                source:        { type: string }
+                notes:         { type: string }
+                nextAction:    { type: string }
+      responses:
+        '201': { description: Lead created }
+
+  /api/candidates/{id}/documents:
+    get:
+      tags: [Candidates]
+      summary: List documents for a candidate (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Document list }
+
+  /api/candidates/{id}/status:
+    put:
+      tags: [Candidates]
+      summary: Update candidate status (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string }
+      responses:
+        '200': { description: Status updated }
+
+  # ─────────────────────────────────────────────────────────────
+  # INVESTORS
+  # ─────────────────────────────────────────────────────────────
+  /api/investors:
+    get:
+      tags: [Investors]
+      summary: List all investors (admin only)
+      parameters:
+        - { in: query, name: page,  schema: { type: integer, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: Investor list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Investor' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+    post:
+      tags: [Investors]
+      summary: Create a new investor (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name:            { type: string, minLength: 2, maxLength: 200, example: Jean-Paul Dubois }
+                email:           { type: string, format: email }
+                phone:           { type: string }
+                type:            { type: string, enum: [individual, entity], default: individual }
+                tier:            { type: string, enum: [Pilot, Standard, Privilège, Premium], default: Pilot }
+                investmentClass: { type: string, enum: [A, B, C, D] }
+                amountCommitted: { type: number, example: 50000 }
+                status:          { type: string, enum: [prospect, signed, funded], default: prospect }
+                brands:          { type: array, items: { type: string } }
+                iban:            { type: string }
+                fsmaAccepted:    { type: boolean }
+                notes:           { type: string, maxLength: 2000 }
+      responses:
+        '201':
+          description: Investor created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Investor' }
+                  message: { type: string }
+
+  /api/investors/{id}:
+    get:
+      tags: [Investors]
+      summary: Get a single investor (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Investor object }
+        '404': { description: Not found }
+    put:
+      tags: [Investors]
+      summary: Update an investor (admin/consultant — tier and role require admin)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:    { type: string }
+                email:   { type: string, format: email }
+                phone:   { type: string }
+                address: { type: string }
+                tier:    { type: string, enum: [Pilot, Standard, Privilège, Premium], description: "Admin only" }
+                role:    { type: string, description: "Admin only" }
+      responses:
+        '200': { description: Updated investor }
+
+  /api/investors/{id}/portfolio:
+    get:
+      tags: [Investors]
+      summary: Get investor portfolio (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Portfolio summary with per-brand breakdown }
+
+  /api/investors/{id}/portfolio/{brandId}:
+    get:
+      tags: [Investors]
+      summary: Get investor portfolio for one brand (admin/consultant)
+      parameters:
+        - { in: path, name: id,      required: true, schema: { type: string } }
+        - { in: path, name: brandId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Single-brand portfolio }
+
+  /api/investors/{id}/documents:
+    get:
+      tags: [Investors]
+      summary: List investor documents (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: type,   schema: { type: string } }
+        - { in: query, name: brand,  schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: Document list }
+
+  /api/investors/{id}/repayments:
+    get:
+      tags: [Investors]
+      summary: List repayments for an investor (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: brand,  schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Repayment list with totals }
+
+  /api/investors/{id}/interest:
+    post:
+      tags: [Investors]
+      summary: Register investor interest in an opportunity (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [opportunityId]
+              properties:
+                opportunityId: { type: string }
+                amount:        { type: number }
+                message:       { type: string, maxLength: 1000 }
+      responses:
+        '201': { description: Interest recorded }
+
+  /api/investors/{id}/opportunities:
+    get:
+      tags: [Investors]
+      summary: Get interested and recommended opportunities for an investor (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: interested and recommended opportunity arrays }
+
+  /api/investors/{id}/contracts:
+    get:
+      tags: [Investors]
+      summary: List contracts for an investor (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Contract list }
+
+  /api/investors/{id}/communications:
+    get:
+      tags: [Investors]
+      summary: List support tickets for an investor (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Support ticket list }
+
+  /api/investors/{id}/notes:
+    post:
+      tags: [Investors]
+      summary: Add an internal note to an investor (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+      responses:
+        '201': { description: Note added }
+
+  # ─────────────────────────────────────────────────────────────
+  # DEVELOPERS
+  # ─────────────────────────────────────────────────────────────
+  /api/developers:
+    get:
+      tags: [Developers]
+      summary: List developers (admin only)
+      parameters:
+        - { in: query, name: region, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: Developer list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Developer' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+    post:
+      tags: [Developers]
+      summary: Submit a new developer (public — pending review)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, contactName, email]
+              properties:
+                name:        { type: string, minLength: 2, maxLength: 200, example: "Immo Bruxelles SPRL" }
+                contactName: { type: string, minLength: 2, maxLength: 100, example: "Marc Lejeune" }
+                email:       { type: string, format: email }
+                phone:       { type: string }
+                type:        { type: string, example: master }
+                regions:     { type: array, items: { type: string } }
+                location:
+                  type: object
+                  properties:
+                    address:      { type: string }
+                    surface:      { type: string }
+                    type:         { type: string }
+                    availability: { type: string }
+                    rent:         { type: number }
+                    notes:        { type: string }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Developer submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Developer' }
+
+  /api/developers/{id}:
+    get:
+      tags: [Developers]
+      summary: Get a single developer with locations (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Developer object }
+        '404': { description: Not found }
+    put:
+      tags: [Developers]
+      summary: Update a developer (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:      { type: string, enum: [active, pending, inactive, rejected] }
+                name:        { type: string, minLength: 2, maxLength: 200 }
+                contactName: { type: string, minLength: 2, maxLength: 100 }
+                email:       { type: string, format: email }
+                phone:       { type: string }
+                type:        { type: string }
+                regions:     { type: array, items: { type: string } }
+                notes:       { type: string }
+      responses:
+        '200': { description: Updated developer }
+    delete:
+      tags: [Developers]
+      summary: Archive a developer (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Developer archived }
+
+  /api/developers/{id}/locations:
+    get:
+      tags: [Developers]
+      summary: List locations for a developer (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: Location list }
+    post:
+      tags: [Developers]
+      summary: Add a location to a developer (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address:      { type: string, minLength: 5 }
+                surface:      { type: string }
+                type:         { type: string }
+                availability: { type: string }
+                rent:         { type: number }
+                notes:        { type: string }
+                status:       { type: string }
+      responses:
+        '201': { description: Location added }
+
+  /api/developers/{id}/locations/{locId}:
+    put:
+      tags: [Developers]
+      summary: Update a developer location (admin only)
+      parameters:
+        - { in: path, name: id,    required: true, schema: { type: string } }
+        - { in: path, name: locId, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address:      { type: string }
+                surface:      { type: string }
+                type:         { type: string }
+                availability: { type: string }
+                rent:         { type: number }
+                notes:        { type: string }
+                status:       { type: string }
+      responses:
+        '200': { description: Updated location }
+
+  # ─────────────────────────────────────────────────────────────
+  # CONSULTANTS
+  # ─────────────────────────────────────────────────────────────
+  /api/consultants:
+    get:
+      tags: [Consultants]
+      summary: List consultants (admin/consultant)
+      parameters:
+        - { in: query, name: region, schema: { type: string } }
+        - { in: query, name: brand,  schema: { type: string } }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Consultant list }
+
+  /api/consultants/{id}:
+    get:
+      tags: [Consultants]
+      summary: Get a consultant (admin/consultant — own profile only for consultants)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Consultant object }
+
+  /api/consultants/{id}/leads:
+    get:
+      tags: [Consultants]
+      summary: List leads assigned to a consultant (admin/consultant — own leads only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: status,   schema: { type: string } }
+        - { in: query, name: priority, schema: { type: string } }
+        - { in: query, name: page,     schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,    schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Lead list }
+
+  /api/consultants/{id}/schedule:
+    get:
+      tags: [Consultants]
+      summary: Get consultant schedule (admin/consultant — own schedule only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Schedule items sorted by date }
+
+  # ─────────────────────────────────────────────────────────────
+  # LEADS
+  # ─────────────────────────────────────────────────────────────
+  /api/leads:
+    get:
+      tags: [Leads]
+      summary: List candidate leads with filters (admin/consultant)
+      parameters:
+        - { in: query, name: brand,      schema: { type: string } }
+        - { in: query, name: region,     schema: { type: string } }
+        - { in: query, name: consultant, schema: { type: string } }
+        - { in: query, name: status,     schema: { type: string } }
+        - { in: query, name: step,       schema: { type: string } }
+        - { in: query, name: priority,   schema: { type: string } }
+        - { in: query, name: search,     schema: { type: string } }
+        - { in: query, name: page,       schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,      schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Lead list }
+
+  /api/leads/steps:
+    get:
+      tags: [Leads]
+      summary: List pipeline step definitions
+      responses:
+        '200': { description: Step definitions }
+
+  /api/leads/concept-types:
+    get:
+      tags: [Leads]
+      summary: List concept type options
+      responses:
+        '200': { description: Concept types }
+
+  /api/leads/new-brand:
+    get:
+      tags: [Leads]
+      summary: List new-brand project leads (admin/consultant)
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: New-brand lead list }
+    post:
+      tags: [Leads]
+      summary: Submit a new-brand project lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [projectName, conceptType, candidate]
+              properties:
+                projectName:  { type: string, minLength: 2, maxLength: 200 }
+                conceptType:  { type: string }
+                candidate:
+                  type: object
+                  required: [name, email]
+                  properties:
+                    name:  { type: string }
+                    email: { type: string, format: email }
+                description: { type: string, maxLength: 2000 }
+                location:    { type: string }
+                budget:      { type: number }
+      responses:
+        '201': { description: New-brand lead submitted }
+
+  /api/leads/{id}:
+    get:
+      tags: [Leads]
+      summary: Get a single lead (admin/consultant — own leads only for consultants)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Lead with opportunityDetail }
+        '404': { description: Not found }
+    put:
+      tags: [Leads]
+      summary: Update a lead (admin/consultant — own leads only for consultants)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentStep:        { type: string }
+                notes:              { type: string, maxLength: 2000 }
+                nextAction:         { type: string, maxLength: 500 }
+                priority:           { type: string, enum: [high, normal, low] }
+                status:             { type: string, enum: [active, archived, closed, won, lost] }
+                assignedTo:         { type: object }
+                requestedDocuments: { type: array }
+      responses:
+        '200': { description: Updated lead }
+    delete:
+      tags: [Leads]
+      summary: Archive a lead (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Lead archived }
+
+  /api/leads/{id}/messages:
+    post:
+      tags: [Leads]
+      summary: Send a message on a lead (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201': { description: Message sent }
+
+  # ─────────────────────────────────────────────────────────────
+  # ONBOARDING
+  # ─────────────────────────────────────────────────────────────
+  /api/onboarding/{id}:
+    get:
+      tags: [Onboarding]
+      summary: Get onboarding record with journey and progress (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string }, description: "Onboarding record UUID" }
+      responses:
+        '200':
+          description: Onboarding record with journey steps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      record:   { $ref: '#/components/schemas/OnboardingRecord' }
+                      journey:
+                        type: array
+                        description: "19 journey steps (s1–s9, p1–p8, opening)"
+                        items:
+                          type: object
+                          properties:
+                            id:       { type: string }
+                            code:     { type: string, example: s6 }
+                            ordinal:  { type: integer }
+                            category: { type: string, enum: [PIPELINE, LEGAL, MANAGEMENT, FORMATION, STAGE, OPENING] }
+                            title:    { type: string }
+                            status:   { type: string, enum: [locked, active, done] }
+                            items:    { type: array }
+                      progress:
+                        type: object
+                        properties:
+                          totalRequired: { type: integer }
+                          totalDone:     { type: integer }
+                          pct:           { type: number }
+        '404': { description: Onboarding record not found }
+
+  /api/onboarding/{id}/items/{itemId}/toggle:
+    post:
+      tags: [Onboarding]
+      summary: Toggle a checklist item done/undone (admin/consultant)
+      parameters:
+        - { in: path, name: id,     required: true, schema: { type: string } }
+        - { in: path, name: itemId, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:   { type: string }
+                      done: { type: boolean }
+
+  /api/onboarding/{id}/items/{itemId}/upload:
+    post:
+      tags: [Onboarding]
+      summary: Mark an item as uploaded (admin/consultant)
+      parameters:
+        - { in: path, name: id,     required: true, schema: { type: string } }
+        - { in: path, name: itemId, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Item marked uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:       { type: string }
+                      uploaded: { type: boolean }
+                      done:     { type: boolean }
+
+  /api/onboarding/{id}/steps/{stepId}/advance:
+    post:
+      tags: [Onboarding]
+      summary: Advance to next step — validates required items are done (admin/consultant)
+      parameters:
+        - { in: path, name: id,     required: true, schema: { type: string } }
+        - { in: path, name: stepId, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Step advanced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      stepId:      { type: string }
+                      stepStatus:  { type: string }
+                      nextStepId:  { type: string, nullable: true }
+                      nextStepCode: { type: string, nullable: true }
+        '409': { description: Required items not yet completed }
+
+  /api/onboarding/{id}/items/{itemId}/notes:
+    post:
+      tags: [Onboarding]
+      summary: Add a note to an onboarding item (admin/consultant)
+      parameters:
+        - { in: path, name: id,     required: true, schema: { type: string } }
+        - { in: path, name: itemId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201': { description: Note added }
+
+  # ─────────────────────────────────────────────────────────────
+  # BACKOFFICE
+  # ─────────────────────────────────────────────────────────────
+  /api/backoffice/dashboard:
+    get:
+      tags: [Backoffice]
+      summary: Full admin dashboard data (admin only)
+      responses:
+        '200':
+          description: Dashboard snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      networkOverview:     { type: object }
+                      pipelineStats:       { type: object }
+                      opportunitiesStats:  { type: object }
+                      documentStats:       { type: object }
+                      supportStats:        { type: object }
+                      repaymentStats:      { type: object }
+                      brandSnapshots:      { type: array }
+                      unreadNotifications: { type: integer }
+                      generatedAt:         { type: string, format: date-time }
+
+  /api/backoffice/stats:
+    get:
+      tags: [Backoffice]
+      summary: Time-series and performance stats (admin only)
+      responses:
+        '200': { description: Stats data }
+
+  /api/backoffice/benchmarks:
+    get:
+      tags: [Backoffice]
+      summary: Network benchmarks (admin only)
+      parameters:
+        - { in: query, name: brand,  schema: { type: string } }
+        - { in: query, name: period, schema: { type: string } }
+      responses:
+        '200': { description: Benchmark data }
+
+  /api/backoffice/repayments:
+    get:
+      tags: [Backoffice]
+      summary: All repayments with filters (admin only)
+      parameters:
+        - { in: query, name: investorId, schema: { type: string } }
+        - { in: query, name: brand,      schema: { type: string } }
+        - { in: query, name: status,     schema: { type: string } }
+        - { in: query, name: page,       schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,      schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Repayment list }
+
+  /api/backoffice/tasks:
+    get:
+      tags: [Backoffice]
+      summary: List CRM tasks (admin only)
+      description: CRM tasks are created automatically when an opportunity is validated (one per losing candidate).
+      parameters:
+        - { in: query, name: status,     schema: { type: string, enum: [pending, done, cancelled] } }
+        - { in: query, name: assignedTo, schema: { type: string } }
+        - { in: query, name: page,       schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,      schema: { type: integer, default: 50 } }
+      responses:
+        '200':
+          description: CRM task list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/CrmTask' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+
+  # ─────────────────────────────────────────────────────────────
+  # SHOPS
+  # ─────────────────────────────────────────────────────────────
+  /api/shops:
+    get:
+      tags: [Shops]
+      summary: List shops
+      parameters:
+        - { in: query, name: brandId, schema: { type: string } }
+        - { in: query, name: region,  schema: { type: string } }
+        - { in: query, name: status,  schema: { type: string } }
+        - { in: query, name: page,    schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,   schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Shop list }
+
+  /api/shops/{id}:
+    get:
+      tags: [Shops]
+      summary: Get a single shop
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Shop object }
+
+  /api/shops/{id}/reports:
+    get:
+      tags: [Shops]
+      summary: List monthly performance reports for a shop (admin/consultant)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: month, schema: { type: string } }
+        - { in: query, name: page,  schema: { type: integer, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Report list with financial data }
+
+  /api/shops/{id}/kpi:
+    get:
+      tags: [Shops]
+      summary: Get KPI snapshot for a shop
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: KPI snapshot with ROI and health status }
+
+  # ─────────────────────────────────────────────────────────────
+  # DOCUMENTS
+  # ─────────────────────────────────────────────────────────────
+  /api/documents:
+    get:
+      tags: [Documents]
+      summary: List documents
+      parameters:
+        - { in: query, name: type,    schema: { type: string } }
+        - { in: query, name: brand,   schema: { type: string } }
+        - { in: query, name: status,  schema: { type: string } }
+        - { in: query, name: project, schema: { type: string } }
+        - { in: query, name: page,    schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,   schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Document list }
+    post:
+      tags: [Documents]
+      summary: Upload a document (multipart/form-data, max 25 MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [type, title]
+              properties:
+                type:    { type: string }
+                title:   { type: string, minLength: 2, maxLength: 200 }
+                brand:   { type: string }
+                project: { type: string }
+                sub:     { type: string }
+                expiry:  { type: string }
+                file:    { type: string, format: binary, description: "Allowed: .pdf .docx .doc .xlsx .xls .png .jpg .jpeg" }
+      responses:
+        '201': { description: Document uploaded }
+
+  /api/documents/types:
+    get:
+      tags: [Documents]
+      summary: List document type definitions
+      responses:
+        '200': { description: Document types }
+
+  /api/documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Get document metadata
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Document metadata }
+    put:
+      tags: [Documents]
+      summary: Update document metadata (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:  { type: string, enum: [validated, pending, expired, missing, signed, review] }
+                title:   { type: string, minLength: 2, maxLength: 200 }
+                sub:     { type: string }
+                expiry:  { type: string }
+                brand:   { type: string }
+                project: { type: string }
+      responses:
+        '200': { description: Updated document }
+    delete:
+      tags: [Documents]
+      summary: Soft-delete a document (admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Document deleted }
+
+  # ─────────────────────────────────────────────────────────────
+  # NOTIFICATIONS
+  # ─────────────────────────────────────────────────────────────
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications for current user
+      parameters:
+        - { in: query, name: kind,   schema: { type: string } }
+        - { in: query, name: brand,  schema: { type: string } }
+        - { in: query, name: unread, schema: { type: boolean } }
+        - { in: query, name: page,   schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,  schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Notification list with unreadCount }
+
+  /api/notifications/read-all:
+    put:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      responses:
+        '200': { description: Count of notifications marked }
+
+  /api/notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      summary: Mark a single notification as read
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Notification marked read }
+
+  /api/notifications/{id}:
+    delete:
+      tags: [Notifications]
+      summary: Delete a notification (hard delete)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Notification deleted }
+
+  # ─────────────────────────────────────────────────────────────
+  # SUPPORT
+  # ─────────────────────────────────────────────────────────────
+  /api/support/tickets:
+    get:
+      tags: [Support]
+      summary: List support tickets (non-admins see own only)
+      parameters:
+        - { in: query, name: status,   schema: { type: string } }
+        - { in: query, name: category, schema: { type: string } }
+        - { in: query, name: brand,    schema: { type: string } }
+        - { in: query, name: priority, schema: { type: string } }
+        - { in: query, name: origin,   schema: { type: string } }
+        - { in: query, name: page,     schema: { type: integer, default: 1 } }
+        - { in: query, name: limit,    schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Ticket list (without full message bodies) }
+    post:
+      tags: [Support]
+      summary: Create a support ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, category, body]
+              properties:
+                subject:  { type: string, minLength: 3, maxLength: 200 }
+                category: { type: string }
+                body:     { type: string, minLength: 10, maxLength: 5000 }
+                priority: { type: string, enum: [low, normal, high, urgent] }
+                brand:    { type: string }
+                project:  { type: string }
+      responses:
+        '201': { description: Ticket created with initial message }
+
+  /api/support/categories:
+    get:
+      tags: [Support]
+      summary: List support categories
+      responses:
+        '200': { description: Category list }
+
+  /api/support/priorities:
+    get:
+      tags: [Support]
+      summary: List priority levels
+      responses:
+        '200': { description: Priority list }
+
+  /api/support/tickets/{id}:
+    get:
+      tags: [Support]
+      summary: Get a ticket with full message thread
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Full ticket with messages }
+    put:
+      tags: [Support]
+      summary: Update ticket (investors limited to status only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:     { type: string, enum: [open, resolved, awaiting-investor, closed, in-progress] }
+                priority:   { type: string, enum: [low, normal, high, urgent] }
+                assignedTo: { type: string }
+                brand:      { type: string, description: "Admin only" }
+                project:    { type: string, description: "Admin only" }
+      responses:
+        '200': { description: Updated ticket }
+
+  /api/support/tickets/{id}/messages:
+    get:
+      tags: [Support]
+      summary: Get all messages for a ticket
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Message list }
+    post:
+      tags: [Support]
+      summary: Post a reply to a ticket
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:        { type: string, minLength: 1, maxLength: 5000 }
+                attachments: { type: array }
+      responses:
+        '201': { description: Message posted }
+
+  # ─────────────────────────────────────────────────────────────
+  # REGIONS
+  # ─────────────────────────────────────────────────────────────
+  /api/regions:
+    get:
+      tags: [Regions]
+      summary: List geographic regions
+      security: []
+      responses:
+        '200': { description: Region list }
+
+  /api/regions/{id}:
+    get:
+      tags: [Regions]
+      summary: Get a region with opportunity and shop counts
+      security: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Region with enriched data }
+
+  # ─────────────────────────────────────────────────────────────
+  # LANDING
+  # ─────────────────────────────────────────────────────────────
+  /api/landing:
+    get:
+      tags: [Landing]
+      summary: Get full landing page content
+      security: []
+      responses:
+        '200': { description: All landing page sections }
+
+  /api/landing/hero:
+    get:
+      tags: [Landing]
+      summary: Get hero section
+      security: []
+      responses:
+        '200': { description: Hero content }
+
+  /api/landing/pillars:
+    get:
+      tags: [Landing]
+      summary: Get value pillars
+      security: []
+      responses:
+        '200': { description: Pillar list }
+
+  /api/landing/who:
+    get:
+      tags: [Landing]
+      summary: Get "who are you" section
+      security: []
+      responses:
+        '200': { description: Who section content }
+
+  /api/landing/portals:
+    get:
+      tags: [Landing]
+      summary: Get portal cards
+      security: []
+      responses:
+        '200': { description: Portal list }
+
+  /api/landing/opportunities:
+    get:
+      tags: [Landing]
+      summary: Get current opportunities for landing
+      security: []
+      responses:
+        '200': { description: Highlighted opportunities }
+
+  /api/landing/ecosystem:
+    get:
+      tags: [Landing]
+      summary: Get ecosystem teaser section
+      security: []
+      responses:
+        '200': { description: Ecosystem teaser }
+
+  /api/landing/join:
+    get:
+      tags: [Landing]
+      summary: Get join CTA section
+      security: []
+      responses:
+        '200': { description: Join content }
+
+  /api/landing/onboarding:
+    get:
+      tags: [Landing]
+      summary: Get investor onboarding section
+      security: []
+      responses:
+        '200': { description: Investor onboarding content }
